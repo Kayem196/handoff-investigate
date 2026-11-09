@@ -27,6 +27,10 @@ module directory, as shown in [INSTALL.md](../INSTALL.md).
 - Ask follow-up questions with the prior user/assistant messages as context. Up to
   ten answered questions fit in one conversation, subject to a 256 KiB total
   provider-request limit. Start a new conversation when the limit is reached.
+- Read policy tables, ordered/unordered lists, bold/emphasised text and inline IDs
+  directly in the conversation. Tables keep their column/row headers and scroll
+  within the answer on narrow screens. This is limited safe formatting, not HTML
+  or a complete Markdown implementation; links and unmatched syntax remain text.
 
 Sharing approval is bound to the loaded investigation/observation, provider and
 model for this process. Each subsequent **Send** shares its question, conversation

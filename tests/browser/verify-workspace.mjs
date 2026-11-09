@@ -83,6 +83,7 @@ try{
   await until(`!document.querySelector('#settings').open`);
   check(await evaluate(`document.activeElement.id==='settings-open'`),'Escape closes settings and returns focus');
   await click('#settings-open'); await fill('#api-key','fictional-provider-key-123');
+  check(await evaluate(`document.querySelector('#settings').dispatchEvent(new Event('close'));document.querySelector('#api-key').value==='fictional-provider-key-123'`),'A queued close event cannot clear a reopened key form');
   await evaluate(`document.querySelector('#settings-form').requestSubmit();true`);
   await until(`!document.querySelector('#settings').open&&document.querySelector('#key-status').textContent==='OpenAI'`);
   check(await evaluate(`document.querySelector('#api-key').value===''&&localStorage.length===0&&sessionStorage.length===0`),'Key field cleared; no browser storage used');
@@ -96,6 +97,13 @@ try{
   await evaluate(`document.querySelector('#chat-form').requestSubmit();true`); await until(`document.querySelector('#sharing').open`);
   await click('#share-approve'); await until(`document.querySelectorAll('.message.assistant').length===1&&!document.querySelector('#send').disabled`);
   check(await evaluate(`document.querySelector('.message.assistant').textContent.includes('0 previous messages')&&!window.__injected&&!document.querySelector('#messages img[src=x]')`),'Approved first turn uses fake provider and safely renders model text');
+  check(await evaluate(`document.querySelector('.response-table').tabIndex===0&&document.querySelector('.response-table').getAttribute('aria-labelledby')===document.querySelector('.response-table caption').id&&document.querySelectorAll('.response-table thead th[scope="col"]').length===3&&document.querySelectorAll('.response-table tbody th[scope="row"]').length===2`),'Model tables have semantic headers and a named keyboard-scrollable container');
+  check(await evaluate(`document.querySelector('.message.assistant em').textContent==='configured'&&document.querySelectorAll('.message.assistant ol li').length===2&&document.querySelector('.response-table code').textContent==='Support team'&&document.querySelector('.message.assistant').textContent.includes('Literal | <img')&&document.querySelector('.message.assistant').textContent.includes('Unclosed formatting: '+String.fromCharCode(96)+'literal and **unclosed')&&!window.__injected`),'Formatting preserves escaped pipes and unmatched markers without executing HTML');
+  for(const width of [390,320]){
+    await call('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:true});
+    check(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1&&document.querySelector('.response-table').scrollWidth>document.querySelector('.response-table').clientWidth`),`Answer table scrolls locally without page overflow at ${width}px`);
+  }
+  await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   await fill('#question','What does that mean for this group?');
   await evaluate(`document.querySelector('#chat-form').requestSubmit();true`);
   await until(`document.querySelectorAll('.message.assistant').length===2&&!document.querySelector('#send').disabled`);

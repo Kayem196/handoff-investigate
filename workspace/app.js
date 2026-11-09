@@ -34,15 +34,57 @@ function busyState(value) {
 function scrollToLatest() { const container = $('conversation-scroll'); container.scrollTop = container.scrollHeight; }
 
 // Tenant and model content is always text; this small renderer never accepts HTML or links.
+let responseTableCount = 0;
+function inlineText(target, text) {
+  for (const part of text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*\n]+\*)/g)) {
+    const marker = /^`[^`]+`$/.test(part) ? ['code', 1] : /^\*\*[^*]+\*\*$/.test(part) ? ['strong', 2] : /^\*[^*\n]+\*$/.test(part) ? ['em', 1] : null;
+    target.append(marker ? element(marker[0], part.slice(marker[1], -marker[1])) : document.createTextNode(part));
+  }
+}
+function tableCells(line) {
+  return line.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '').split(/(?<!\\)\|/).map(cell => cell.trim().replace(/\\\|/g, '|'));
+}
 function richText(target, text) {
-  let list;
-  for (const line of text.split('\n')) {
-    const bullet = /^\s*[-*]\s+/.test(line);
-    if (bullet && !list) { list = element('ul'); target.append(list); }
+  let list, listType;
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  const nextContent = start => { while (start < lines.length && !lines[start].trim()) start++; return start; };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) { list = null; continue; }
+    const separator = nextContent(i + 1);
+    const headers = tableCells(line);
+    if (line.includes('|') && headers.length > 1 && headers.length <= 12 && headers.every(Boolean) && separator < lines.length) {
+      const dividers = tableCells(lines[separator]);
+      if (dividers.length === headers.length && dividers.every(cell => /^:?-{3,}:?$/.test(cell))) {
+        list = null;
+        const wrapper = element('div', undefined, 'response-table');
+        wrapper.tabIndex = 0; wrapper.setAttribute('role', 'region');
+        const table = element('table');
+        const caption = element('caption', `Response table: ${headers.join(', ')}`, 'sr-only');
+        caption.id = `response-table-${++responseTableCount}`;
+        wrapper.setAttribute('aria-labelledby', caption.id);
+        const head = element('thead'), headingRow = element('tr'), body = element('tbody');
+        for (const header of headers) { const cell = element('th'); cell.scope = 'col'; inlineText(cell, header); headingRow.append(cell); }
+        head.append(headingRow);
+        let rowIndex = nextContent(separator + 1);
+        i = separator;
+        while (rowIndex < lines.length && lines[rowIndex].includes('|')) {
+          const cells = tableCells(lines[rowIndex]);
+          if (cells.length !== headers.length) break;
+          const row = element('tr');
+          cells.forEach((value, column) => { const cell = element(column === 0 ? 'th' : 'td'); if (column === 0) cell.scope = 'row'; inlineText(cell, value); row.append(cell); });
+          body.append(row); i = rowIndex; rowIndex = nextContent(rowIndex + 1);
+        }
+        table.append(caption, head, body); wrapper.append(table); target.append(wrapper);
+        continue;
+      }
+    }
+    const bullet = /^\s*(?:([-*])|(\d{1,4})[.)])\s+/.exec(line);
+    const type = bullet?.[2] ? 'ol' : 'ul';
+    if (bullet && (!list || listType !== type)) { list = element(type); listType = type; if (type === 'ol') list.start = Number(bullet[2]); target.append(list); }
     if (!bullet) list = null;
     const node = element(bullet ? 'li' : /^#{1,3} /.test(line) ? 'h3' : 'p');
-    const clean = line.replace(bullet ? /^\s*[-*]\s+/ : /^#{1,3} /, '');
-    for (const part of clean.split(/(\*\*[^*]+\*\*)/g)) node.append(part.startsWith('**') && part.endsWith('**') ? element('strong', part.slice(2, -2)) : document.createTextNode(part));
+    inlineText(node, line.replace(bullet ? /^\s*(?:[-*]|\d{1,4}[.)])\s+/ : /^#{1,3} /, ''));
     (bullet ? list : target).append(node);
   }
 }
@@ -179,7 +221,7 @@ $('home').addEventListener('click', event => { event.preventDefault(); $('questi
 for (const button of document.querySelectorAll('[data-close]')) button.addEventListener('click', () => $(button.dataset.close).close());
 for (const button of document.querySelectorAll('[data-question]')) button.addEventListener('click', () => { $('question').value = button.dataset.question; $('question').focus(); });
 $('provider').addEventListener('change', () => { $('model').value = $('provider').value === 'OpenAI' ? 'gpt-5' : 'claude-opus-5-5'; });
-$('settings').addEventListener('close', () => { $('api-key').value = ''; });
+$('settings').addEventListener('close', () => { if (!$('settings').open) $('api-key').value = ''; });
 $('settings-form').addEventListener('submit', async event => {
   event.preventDefault(); const button = event.submitter || $('settings-form').querySelector('button[type="submit"]'); button.disabled = true;
   try {
@@ -196,7 +238,7 @@ $('forget').addEventListener('click', async () => {
   try { config = await api('forget'); $('settings').close(); if (selected) await choose(selected); updateSharingStatus(); }
   catch (error) { showError('settings-error', error.message); }
 });
-$('sharing').addEventListener('close', () => { if (pending) void cancelPrepared(); });
+$('sharing').addEventListener('close', () => { if (!$('sharing').open && pending) void cancelPrepared(); });
 $('share-cancel').addEventListener('click', () => $('sharing').close());
 $('share-approve').addEventListener('click', () => { if (pending) void sendPrepared(pending, true); });
 $('new-chat').addEventListener('click', async () => { if (!selected || busy) return; try { await api('reset', { id: selected }); await choose(selected); $('question').focus(); } catch (error) { showError('chat-error', error.message); } });

@@ -13,6 +13,22 @@ $null=Save-HandoffInvestigationObservation -Path (Join-Path $FixtureRoot 'hostil
         $request=$Body | ConvertFrom-Json -AsHashtable
         $previous=$request.messages.Count - 2
         $text="**Support team** has two explicit recorded references. Coverage is incomplete. Follow-up context: $previous previous messages.`n`n- Require MFA for support includes the group.`n- Windows compliance includes the group.`n`nNo deletion approval. Literal hostile text: <img src=x onerror=window.__injected=true>"
+        $text += @'
+
+
+| Policy | State | Includes |
+
+|---|---|---|
+
+| Require MFA for support | Enabled | `Support team` |
+
+| Literal \| <img src=x onerror=window.__injected=true> | Disabled | Group with an unresolved name |
+
+1. Check *configured* targeting.
+2. Verify `bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb` before making changes.
+
+Unclosed formatting: `literal and **unclosed
+'@
         return @{status=200;body=@{choices=@(@{finish_reason='stop';message=@{content=$text}})}}
     }
 }

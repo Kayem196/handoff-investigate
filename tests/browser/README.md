@@ -13,10 +13,11 @@ node ./public-handoff/tests/browser/verify-workspace.mjs `
 In the standalone repository, omit `public-handoff/` from the script path.
 The suite starts a test-owned PowerShell host with fictional/hostile fixtures
 and a fake provider sender. It does not change the production launcher or
-contact a provider. Its 25 checks cover HTTP origin/token/body-size guards,
+contact a provider. Its 30 checks cover HTTP origin/token/body-size guards,
 safe tenant/model text, friendly policy names, collapsed technical evidence,
 responsive layouts, dialog keyboard focus, key clearing, sharing cancellation,
-multi-turn context, investigation isolation and revocation. Screenshots and
+multi-turn context, investigation isolation, revocation, semantic answer tables,
+locally scrolling narrow-screen tables and safe inline/list formatting. Screenshots and
 `workspace-checks.json` are saved in the new output directory. Real provider
 compatibility, Graph login, screen readers and the complete live-read agent
 remain separate acceptance gates.
