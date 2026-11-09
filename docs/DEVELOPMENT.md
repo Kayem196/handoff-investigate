@@ -313,8 +313,11 @@ so always check answers against the report.
 
 **Transport and failures:** redirects are refused and requests time out. Each
 failure becomes a fixed code (`provider_auth_failed`, `provider_rate_limited`,
-`provider_redirect_rejected`, `provider_unreachable` and similar) without echoing
-provider response bodies. Answers are returned, not saved. There is no fallback
+`provider_redirect_rejected`, `provider_unreachable`, `provider_output_limit`,
+`provider_quota_exhausted` (an OpenAI account without API credit) and similar) without echoing provider response bodies. An answer the provider cut
+short is returned with `truncated = true`. OpenAI and Azure requests use
+`max_completion_tokens` (4,000), because current models reject `max_tokens` and
+reasoning tokens count against the budget. Answers are returned, not saved. There is no fallback
 provider.
 
 Verification on 9 November: 18 Axon tests passed, using mocked provider calls
@@ -328,8 +331,17 @@ references correctly. It put the incomplete compliance coverage first, separated
 configured targeting from membership and applicability, and refused a deletion
 verdict. It also pointed to the manual checks. A random invalid key returned HTTP
 401, mapped to `provider_auth_failed` with no echoed provider text. The saved
-results contain no key material. OpenAI and Azure OpenAI are still unverified
-live, as is behaviour with real tenant evidence or hostile policy names against a
+results contain no key material.
+
+OpenAI live check, 9 November, with fictional data and model `gpt-5`:
+- A random invalid key returned HTTP 401, mapped to `provider_auth_failed`.
+- The operator's real key was accepted, and the request was sent after `SHARE`,
+  but OpenAI returned HTTP 429 instead of an answer. That is consistent with an
+  account that has no API credit.
+- That outcome led to the new `provider_quota_exhausted` code. Repeat once the
+  account has credit.
+
+A live OpenAI answer and Azure OpenAI as a whole remain unverified live, as is behaviour with real tenant evidence or hostile policy names against a
 live model. Axon can't yet start guided reads, and consent is
 per request, not stored per investigation.
 

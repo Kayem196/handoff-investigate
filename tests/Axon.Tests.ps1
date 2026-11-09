@@ -65,6 +65,18 @@ Describe 'Optional Axon explanations' {
         $result.answer | Should -Be 'OpenAI answer'
         $sent[0].uri.AbsoluteUri | Should -Be 'https://api.openai.com/v1/chat/completions'
         $sent[0].headers.Authorization | Should -Be 'Bearer fictional-provider-key-123'
+        $request = $sent[0].body | ConvertFrom-Json -AsHashtable
+        $request.Contains('max_tokens') | Should -BeFalse
+        $request.max_completion_tokens | Should -Be 4000
+        $result.truncated | Should -BeFalse
+    }
+    It 'distinguishes an output-limit stop from an empty answer and flags truncation' {
+        $script:reply = @{status=200;body=@{choices=@(@{finish_reason='length';message=@{content=$null}})}}
+        (Invoke-HandoffAxonExplanation @base -Provider OpenAI -Model 'gpt-test' -ApiKey $key).failureCode | Should -Be 'provider_output_limit'
+        $script:reply = @{status=200;body=@{stop_reason='max_tokens';content=@(@{type='text';text='Partial answer'})}}
+        $partial = Invoke-HandoffAxonExplanation @base -ApiKey $key
+        $partial.status | Should -Be 'answered'
+        $partial.truncated | Should -BeTrue
     }
     It 'builds a fixed Azure OpenAI deployment URL and rejects unsafe endpoints' {
         $script:reply = @{status=200;body=@{choices=@(@{message=@{content='Azure answer'}})}}
@@ -85,6 +97,14 @@ Describe 'Optional Axon explanations' {
         $result = Invoke-HandoffAxonExplanation @base -ApiKey $key
         $result.failureCode | Should -Be $_.code
         ($result | ConvertTo-Json -Depth 10) | Should -Not -Match 'private provider detail'
+    }
+    It 'separates an account without API credit from throttling, without echoing provider text' {
+        $script:reply = @{status=429;body=[pscustomobject]@{error=[pscustomobject]@{code='insufficient_quota';message='private billing detail'}}}
+        $quota = Invoke-HandoffAxonExplanation @base -Provider OpenAI -Model 'gpt-test' -ApiKey $key
+        $quota.failureCode | Should -Be 'provider_quota_exhausted'
+        ($quota | ConvertTo-Json -Depth 10) | Should -Not -Match 'private billing detail'
+        $script:reply = @{status=429;body=[pscustomobject]@{error=[pscustomobject]@{code='rate_limit_exceeded'}}}
+        (Invoke-HandoffAxonExplanation @base -Provider OpenAI -Model 'gpt-test' -ApiKey $key).failureCode | Should -Be 'provider_rate_limited'
     }
     It 'reports transport failure and empty answers without inventing content' {
         Mock Send-HandoffAxonRequest -ModuleName Handoff.Axon { throw 'socket detail with secret' }

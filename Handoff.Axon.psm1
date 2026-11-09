@@ -121,7 +121,8 @@ function Invoke-HandoffAxonExplanation {
             }
             default {
                 $headers = $(if ($Provider -eq 'OpenAI') { @{Authorization="Bearer $plainKey"} } else { @{'api-key'=$plainKey} })
-                $body = @{max_tokens=1500;messages=@(@{role='system';content=$script:SystemPrompt},@{role='user';content=$userText})}
+                # Current OpenAI models reject max_tokens; reasoning tokens also count against this budget.
+                $body = @{max_completion_tokens=4000;messages=@(@{role='system';content=$script:SystemPrompt},@{role='user';content=$userText})}
                 if ($Provider -eq 'OpenAI') { $body.model = $Model }
             }
         }
@@ -130,11 +131,20 @@ function Invoke-HandoffAxonExplanation {
     } finally { $plainKey = $null; $headers = $null }
     if ($response.status -lt 200 -or $response.status -ge 300) {
         $code = switch ($response.status) { {$_ -in 401,403} {'provider_auth_failed'} 404 {'provider_model_not_found'} 429 {'provider_rate_limited'} {$_ -in 300..399} {'provider_redirect_rejected'} default {'provider_error'} }
+        # OpenAI uses 429 for both throttling and an account without API credit. Compare only
+        # the error code to a known value; no provider text is copied into the result.
+        if ($response.status -eq 429 -and [string]$response.body.error.code -ceq 'insufficient_quota') { $code = 'provider_quota_exhausted' }
         return [pscustomobject]@{status='failed';failureCode=$code;httpStatus=$response.status;sharing=$sharing}
     }
-    $text = $(if ($Provider -eq 'Anthropic') { (@($response.body.content | Where-Object type -eq 'text') | ForEach-Object text) -join "`n" } else { $response.body.choices[0].message.content })
-    if ([string]::IsNullOrWhiteSpace($text)) { return [pscustomobject]@{status='failed';failureCode='provider_empty_response';sharing=$sharing} }
-    return [pscustomobject]@{status='answered';answer=$text;sharing=$sharing
+    if ($Provider -eq 'Anthropic') {
+        $text = (@($response.body.content | Where-Object type -eq 'text') | ForEach-Object text) -join "`n"
+        $truncated = $response.body.stop_reason -eq 'max_tokens'
+    } else {
+        $text = $response.body.choices[0].message.content
+        $truncated = $response.body.choices[0].finish_reason -eq 'length'
+    }
+    if ([string]::IsNullOrWhiteSpace($text)) { return [pscustomobject]@{status='failed';failureCode=$(if($truncated){'provider_output_limit'}else{'provider_empty_response'});sharing=$sharing} }
+    return [pscustomobject]@{status='answered';answer=$text;truncated=[bool]$truncated;sharing=$sharing
         disclaimer='AI explanation of recorded evidence only. Verify against the report and its manual checks; it is not a finding, current state or change approval.'}
 }
 
