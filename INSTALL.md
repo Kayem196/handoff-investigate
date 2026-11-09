@@ -115,7 +115,8 @@ API key for Anthropic (recommended), OpenAI or an Azure OpenAI deployment.
 Preview what would be sent with `-PreviewOnly`. Nothing is sent until you type
 `SHARE`. See [Optional Axon explanations](docs/DEVELOPMENT.md#optional-axon-explanations)
 for exactly what is shared and how failures are reported. Anthropic and OpenAI have been verified
-live with fictional data; Azure OpenAI has not.
+live with fictional data. Azure OpenAI is experimental: it is implemented from
+Microsoft's documented API but has not been tested against a real deployment.
 
 ## Verified and not yet verified
 
@@ -127,6 +128,11 @@ Live reads have been accepted in one test tenant. Still unverified:
 - other Windows and PowerShell versions
 - PowerShell Gallery publication
 - signed scripts and AllSigned execution policy
+
+For an offline clean-environment check, see the
+[Windows Sandbox kit](tests/package/sandbox/README.md). It bundles portable
+PowerShell, disables networking and preserves results outside the disposable
+Sandbox. A local kit rehearsal is not a genuine Sandbox acceptance result.
 - proxies
 - readers with fewer rights than Global Administrator
 - large or multipage tenants

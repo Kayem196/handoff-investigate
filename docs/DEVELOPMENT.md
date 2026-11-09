@@ -346,7 +346,9 @@ OpenAI live check, 9 November, with fictional data and model `gpt-5`:
   declined a deletion verdict. It also pointed to the manual checks. The results
   contain no key material.
 
-Azure OpenAI remains unverified live, as is behaviour with real tenant evidence or hostile policy names against a
+Azure OpenAI is implemented from Microsoft's documented API
+(`api-version=2024-10-21`) but has **not been tested** against a real
+deployment. Treat it as experimental. Azure OpenAI also remains unverified live, as is behaviour with real tenant evidence or hostile policy names against a
 live model. Axon can't yet start guided reads, and consent is
 per request, not stored per investigation.
 

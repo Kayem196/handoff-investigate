@@ -45,6 +45,7 @@ try {
     $child = @'
 $ErrorActionPreference = 'Stop'
 $out = [ordered]@{}
+$out.executionPolicy = (Get-ExecutionPolicy -List | ForEach-Object { '{0}={1}' -f $_.Scope,$_.ExecutionPolicy }) -join '; '
 try {
     Import-Module Handoff
     $m = Get-Module Handoff
@@ -61,7 +62,13 @@ try {
 } catch { $out.error = $_.Exception.Message }
 $out | ConvertTo-Json -Compress
 '@
-    $json = pwsh -NoProfile -Command $child
+    # Do not inherit the bootstrap's process-level Bypass into the acceptance check.
+    $processPolicy = $env:PSExecutionPolicyPreference
+    try {
+        Remove-Item Env:PSExecutionPolicyPreference -ErrorAction SilentlyContinue
+        # A portable PowerShell copy (e.g. in Sandbox) is not on PATH.
+        $json = & (Get-Process -Id $PID).Path -NoProfile -Command $child
+    } finally { $env:PSExecutionPolicyPreference = $processPolicy }
     $result = ($json | Select-Object -Last 1) | ConvertFrom-Json -AsHashtable
     $record.freshProcess = $result
     Add-Step 'Import by name in a fresh process' (-not $result.error -and $result.moduleBase -eq $target -and $result.commands -eq $result.declaredCommands) $result.error
@@ -80,3 +87,4 @@ $out | ConvertTo-Json -Compress
 Write-Host ''
 Write-Host "Overall: $($record.status). Results: $ResultsDirectory"
 if ($target) { Write-Host "To uninstall afterwards: Remove-Item -LiteralPath '$([IO.Path]::GetDirectoryName($target))' -Recurse" }
+if ($record.status -ne 'PASS') { exit 1 }
