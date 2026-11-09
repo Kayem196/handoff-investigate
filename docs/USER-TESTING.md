@@ -11,7 +11,25 @@ and Intune device-compliance policies. It is not a whole-tenant relationship map
 or a conversational tenant agent. Axon can answer questions about one saved
 observation, but cannot fetch more evidence or take actions.
 
-## 1. First session: no AI, no tenant changes
+## 1. Start with the graphical workspace
+
+The first [Handoff UI preview](WORKSPACE.md) is available. From the standalone
+source folder run `pwsh -NoProfile -File ./Start-Handoff.ps1`. It opens a browser,
+not a terminal chat. Choose your saved investigation or the clearly labelled
+fictional sample. Check the friendly policy names and expandable evidence first.
+Then use **AI settings** to add a key and ask questions in the same conversation.
+Sharing approval stays inside the app; the exact payload is an optional detail.
+
+This UI currently discusses saved evidence. It cannot sign in to the tenant,
+collect more data or make changes. Follow-up conversation context is retained
+in this local session, up to ten answered questions per investigation before
+starting a new conversation. A browser reload retains the session if opened
+with the same local session URL; stopping the host forgets it.
+
+The sections below also document the underlying CLI collection/adapter paths.
+They are not the intended primary chat experience.
+
+## 2. Collect test evidence: no AI, no tenant changes
 
 Follow [installation and sign-in](../INSTALL.md#3-run-an-investigation), using the
 dedicated read-only registration and a fresh PowerShell window. Do not reuse a
@@ -36,7 +54,7 @@ Other tenant policies may add legitimate references. The two fixture CA states
 should remain disabled and report-only. Keep the fixture groups empty; do not
 enable policies, add members or delete anything to test Handoff.
 
-## 2. Questions to check against the report
+## 3. Questions to check against the evidence
 
 Tick an item only when you can identify the evidence or the stated limitation.
 
@@ -87,7 +105,7 @@ Tick an item only when you can identify the evidence or the stated limitation.
 - [ ] **Can I explain the findings and next checks in my own words?** Note any
   confusing label, missing context or portal lookup that took unnecessary work.
 
-## 3. Optional: ask Axon the same questions
+## 4. Optional: command-line adapter checks
 
 Start only after the non-AI report is useful. Prefer the fictional example for
 your first AI session. Real fixture evidence is still tenant data: names, IDs,
@@ -142,7 +160,7 @@ An answer fails the test if it invents evidence, treats old observations as live
 hides incomplete coverage, approves deletion or claims it changed the tenant.
 Provider wording varies; verify facts and boundaries, not exact phrasing.
 
-## 4. Feedback to bring back
+## 5. Feedback to bring back
 
 For each check, record **PASS / FAIL / UNCLEAR / NOT TESTED**, plus:
 

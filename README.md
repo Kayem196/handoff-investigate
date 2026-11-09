@@ -10,9 +10,28 @@ policy assignments. It keeps the original policy settings as evidence, tells
 you what it could not check, and gives you specific manual checks before you
 make a change.
 
-It never changes your tenant. It doesn't need a server, database, account or
-AI. The optional AI explainer only runs when you ask for it and confirm what to
-share.
+It never changes your tenant. It needs no hosted service, Docker, database or
+Handoff account. Optional AI runs only when you ask and approve sharing.
+
+## Handoff workspace — first UI preview
+
+Open the local Handoff-branded workspace from the standalone source folder:
+
+```powershell
+pwsh -NoProfile -File ./Start-Handoff.ps1
+```
+
+It opens your browser with saved investigations, friendly policy names,
+expandable evidence and multi-turn chat. Add an OpenAI or Anthropic key in
+**AI settings**, then approve sharing inside the app. The bundled fictional
+example works for browsing without a key. No raw payload file or terminal chat
+is needed.
+
+**This first UI slice uses saved evidence, not a live tenant connection.**
+Live discovery/collection still uses the read-only PowerShell guide below;
+chat cannot perform those reads yet. Conversation history and keys stay in
+the local host's memory for this session. See the
+[workspace guide and security boundary](docs/WORKSPACE.md).
 
 > **Preview (0.1.0-preview1).** This has been tested on Windows 11 with
 > PowerShell 7.6.9 and verified against a test tenant. Read
@@ -64,6 +83,7 @@ Import-Module Handoff
 - [INSTALL.md](INSTALL.md): setup, permissions and removing access
 - [Manual testing checklist](docs/USER-TESTING.md): first-session questions,
   expected evidence and optional Axon checks
+- [Workspace guide](docs/WORKSPACE.md): local graphical chat, sharing and limitations
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): command reference, data contracts,
   limits and verification records
 - [docs/KNOWN-ANSWER-CHECKS.md](docs/KNOWN-ANSWER-CHECKS.md),

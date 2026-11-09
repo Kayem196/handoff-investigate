@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Investigate | Handoff</title>
+  <link rel="icon" href="/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" type="module"></script>
+</head>
+<body>
+  <a class="skip" href="#conversation-title">Skip to conversation</a>
+  <div class="workspace">
+    <aside class="sidebar" aria-label="Workspace">
+      <a class="brand" href="/" id="home"><img src="/mark.svg" width="32" height="32" alt=""><span>hand<span class="brand-dot">off</span></span></a>
+      <div class="workspace-label"><span class="workspace-icon" aria-hidden="true">H</span><div><strong>Your workspace</strong><small>Local, read-only investigation</small></div></div>
+      <div class="nav-current"><span aria-hidden="true">⌕</span> Investigate</div>
+      <details class="investigation-navigation" open>
+        <summary>Saved investigations <span id="item-count"></span></summary>
+        <label class="sr-only" for="search">Find a saved group</label>
+        <input id="search" type="search" placeholder="Find a group…" autocomplete="off">
+        <nav id="investigations" aria-label="Saved investigations"></nav>
+      </details>
+      <p class="sidebar-note">Investigations stay on this computer. No Handoff account or cloud workspace.</p>
+      <div class="sidebar-bottom">
+        <button id="settings-open" class="sidebar-button" type="button"><span aria-hidden="true">⚙</span> AI settings <span id="key-status" class="small-badge">Not set</span></button>
+        <button id="stop-open" class="sidebar-button subtle" type="button">Stop workspace</button>
+        <span class="preview-label">Handoff Investigate · UI preview</span>
+      </div>
+    </aside>
+    <div class="work-area">
+      <header class="topbar"><div><strong>Investigate</strong><span class="topbar-description">Understand the relationships behind your configuration</span></div><span class="local-status"><span aria-hidden="true"></span> Saved evidence, not live</span></header>
+      <div id="notice" role="status" class="notice" hidden></div>
+      <div class="content-layout">
+        <main class="conversation">
+          <header class="conversation-heading"><div><span id="source-label" class="eyebrow">Choose an investigation</span><h1 id="conversation-title" tabindex="-1">Let’s understand your infrastructure.</h1><p id="selection-detail">Start with a saved group investigation or explore the fictional example.</p></div><button id="new-chat" class="quiet-button" type="button">New conversation</button></header>
+          <div id="conversation-scroll" class="conversation-scroll">
+            <div id="welcome" class="welcome">
+              <img src="/mark.svg" width="42" height="42" alt="">
+              <h2>What would you like to understand?</h2>
+              <p>Ask about a group, the policies that reference it, or what a relationship means. Handoff keeps the evidence close, so you can check the answer.</p>
+              <div class="suggestions">
+                <button type="button" data-question="Explain what this group is used for in the recorded policies. Use friendly names where available and distinguish facts from unknowns."><strong>Help me understand this group</strong><span>Its recorded purpose and policy relationships</span></button>
+                <button type="button" data-question="Which policies include or exclude this group? Explain their names, states and the evidence for each relationship."><strong>Show me what’s connected</strong><span>Inclusions, exclusions and policy states</span></button>
+                <button type="button" data-question="What do the assignment filters mean here, and what should I verify before changing this group?"><strong>What should I check next?</strong><span>Filters, missing evidence and manual checks</span></button>
+              </div>
+              <p id="welcome-note" class="welcome-note">No AI request has been made. You control when evidence is shared.</p>
+            </div>
+            <div id="messages" aria-label="Conversation"></div>
+          </div>
+          <div class="composer-area">
+            <div id="chat-error" role="alert" class="inline-error" hidden></div>
+            <form id="chat-form" action="/" method="post">
+              <label for="question">Ask Handoff</label>
+              <div class="composer"><textarea id="question" name="question" maxlength="4000" rows="2" placeholder="What would you like to know about this group?" required aria-describedby="composer-help"></textarea><button id="send" type="submit" class="primary">Send <span aria-hidden="true">↑</span></button></div>
+            </form>
+            <p id="composer-help">Enter to send · Shift + Enter for a new line. No live reads or tenant changes in this preview.</p>
+            <p id="sharing-status" class="sharing-status">AI is optional. Evidence is available without a provider key.</p>
+          </div>
+        </main>
+        <aside class="evidence-panel" aria-label="Investigation evidence">
+          <details id="evidence-disclosure" open><summary>Investigation evidence <span aria-hidden="true">↗</span></summary><div id="evidence"><p class="muted">Choose an investigation to see its recorded relationships.</p></div></details>
+        </aside>
+      </div>
+    </div>
+  </div>
+  <dialog id="settings" aria-labelledby="settings-title">
+    <form id="settings-form" action="/" method="post">
+      <div class="dialog-heading"><h2 id="settings-title">AI settings</h2><button class="close-button" type="button" data-close="settings" aria-label="Close AI settings">×</button></div>
+      <p>Use your own provider account. Your key stays in this local process, not in a file or browser storage. Provider usage charges apply.</p>
+      <label for="provider">Provider</label><select id="provider" name="provider"><option value="OpenAI">OpenAI</option><option value="Anthropic">Anthropic</option></select>
+      <label for="model">Model</label><input id="model" name="model" value="gpt-5" pattern="[A-Za-z0-9._:\-]{1,128}" maxlength="128" required spellcheck="false" autocapitalize="off">
+      <label for="api-key">API key</label><input id="api-key" name="api-key" type="password" autocomplete="off" minlength="10" maxlength="512" required spellcheck="false" autocapitalize="off" aria-describedby="key-help">
+      <p id="key-help" class="muted">Never put a key in the chat. Changing settings clears conversation history and sharing approvals.</p>
+      <p id="settings-error" role="alert" class="inline-error" hidden></p>
+      <div class="dialog-actions"><button id="forget" class="quiet-button" type="button">Forget key & chats</button><button class="primary" type="submit">Use for this session</button></div>
+    </form>
+  </dialog>
+  <dialog id="sharing" aria-labelledby="sharing-title">
+    <div class="dialog-heading"><h2 id="sharing-title">Let Handoff discuss this evidence?</h2><button type="button" class="close-button" data-close="sharing" aria-label="Cancel sharing">×</button></div>
+    <p id="sharing-description"></p>
+    <div class="sharing-scope"><strong>Shared with the selected AI provider</strong><ul><li>This group’s name, IDs, matched policy settings and coverage</li><li>Your questions and this conversation’s previous answers</li></ul><strong>Not included by this workspace</strong><p>API keys, sign-in tokens and private notes are not part of the model context. The tenant ID is omitted from the selected evidence envelope; this is not automatic redaction of policy text or your messages.</p></div>
+    <p>Approval applies to this investigation, provider and model for this local session. Each Send shares the next question. Start a new conversation or forget the key to revoke approval. Nothing can change your tenant.</p>
+    <details><summary>Inspect the exact technical request</summary><pre id="payload"></pre></details>
+    <div class="dialog-actions"><button id="share-cancel" class="quiet-button" type="button">Keep local</button><button id="share-approve" class="primary" type="button">Allow & send question</button></div>
+  </dialog>
+  <dialog id="stop-dialog" aria-labelledby="stop-title"><h2 id="stop-title">Stop this workspace?</h2><p>This forgets your key, sharing approvals and conversation history. Your saved investigation files are not changed.</p><div class="dialog-actions"><button class="quiet-button" type="button" data-close="stop-dialog" autofocus>Keep open</button><button id="stop" class="primary" type="button">Stop & forget session</button></div></dialog>
+  <div id="announcer" class="sr-only" aria-live="polite"></div>
+</body>
+</html>

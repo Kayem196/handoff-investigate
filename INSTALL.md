@@ -19,6 +19,10 @@ and reports. Collection compiles one bundled C# file with `Add-Type`.
 Environments that block `Add-Type`, such as Constrained Language Mode, are not
 supported yet.
 
+The graphical workspace also needs a current Edge/Chromium browser. It uses a
+loopback-only PowerShell HTTP host, not the wider Handoff web application's
+Docker/database stack. It is a first UI preview; see [its boundaries](docs/WORKSPACE.md).
+
 ## 1. Install the module
 
 Get the package folder, then check every file against `SHA256SUMS.txt`, from the
@@ -46,6 +50,18 @@ Try the fictional example (no tenant access):
 $base = (Get-Module Handoff).ModuleBase
 & "$base/examples/export-investigation.ps1" -OutDirectory (Join-Path $env:TEMP ('handoff-demo-' + [guid]::NewGuid()))
 ```
+
+To open the graphical workspace instead:
+
+```powershell
+& (Join-Path (Get-Module Handoff).ModuleBase 'Start-Handoff.ps1')
+```
+
+Use **AI settings** inside the workspace for an optional OpenAI/Anthropic key.
+No evidence is sent while adding the key. The first question asks for sharing
+approval for that saved investigation, provider and model. The workspace has
+no live tenant connection in this slice; the collection steps below remain
+separate. Use **Stop workspace** to forget the session and stop the local host.
 
 For live collection, install the pinned authentication module:
 

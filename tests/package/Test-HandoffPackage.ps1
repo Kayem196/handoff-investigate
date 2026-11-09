@@ -39,5 +39,11 @@ $checks.Add('evaluate, save and export work from the packaged files')
 $examples = & (Join-Path $module.ModuleBase 'examples/export-investigation.ps1') -OutDirectory (Join-Path $work 'example')
 Assert-Check ((Test-Path -LiteralPath $examples.Html) -and (Test-Path -LiteralPath $examples.Json)) 'Packaged example failed.'
 $checks.Add('packaged fictional example runs')
+Import-Module (Join-Path $module.ModuleBase 'Handoff.Workspace.psm1')
+$workspace = Get-Module Handoff.Workspace
+$workspaceSummary = & $workspace { param($root) Get-HandoffWorkspaceSummary (New-HandoffWorkspaceState $root) } (Join-Path $work 'no-saved-investigations')
+Assert-Check ($workspace.ModuleBase.StartsWith($PackageRoot, [StringComparison]::OrdinalIgnoreCase)) 'Workspace imported outside the package.'
+Assert-Check ($workspaceSummary.items.Count -eq 1 -and $workspaceSummary.items[0].sample -and -not $workspaceSummary.keyConfigured) 'Packaged workspace sample state failed.'
+$checks.Add('packaged graphical workspace prepares its offline sample without a key')
 Assert-Check (-not (Get-Module Microsoft.Graph.Authentication)) 'Offline use loaded the Graph SDK.'
 [pscustomobject]@{ Status = 'PASS'; Checks = $checks; WorkDirectory = $work } | ConvertTo-Json

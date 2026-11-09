@@ -14,6 +14,7 @@ Rules:
 - Distinguish configured targeting from group membership and runtime applicability.
 - You cannot run commands, read more data or change the tenant. When more evidence is needed, point to the report's manual checks.
 - Answer in plain English for an IT administrator, concisely.
+- Prefer friendly group and policy names supplied in the evidence. Never guess a name for an unresolved ID; keep IDs available for verification rather than leading with them.
 '@
 
 function New-HandoffAxonContext {
@@ -129,6 +130,11 @@ function Invoke-HandoffAxonExplanation {
         try { $response = Send-HandoffAxonRequest -Uri $endpoint -Headers $headers -Body (ConvertTo-Json $body -Depth 10 -Compress) -TimeoutSeconds $TimeoutSeconds }
         catch { return [pscustomobject]@{status='failed';failureCode='provider_unreachable';sharing=$sharing} } # Raw transport errors are not echoed.
     } finally { $plainKey = $null; $headers = $null }
+    return ConvertFrom-HandoffAxonResponse -Response $response -Sharing $sharing
+}
+
+function ConvertFrom-HandoffAxonResponse {
+    param($Response, $Sharing)
     if ($response.status -lt 200 -or $response.status -ge 300) {
         $code = switch ($response.status) { {$_ -in 401,403} {'provider_auth_failed'} 404 {'provider_model_not_found'} 429 {'provider_rate_limited'} {$_ -in 300..399} {'provider_redirect_rejected'} default {'provider_error'} }
         # OpenAI uses 429 for both throttling and an account without API credit. Compare only
@@ -136,7 +142,7 @@ function Invoke-HandoffAxonExplanation {
         if ($response.status -eq 429 -and [string]$response.body.error.code -ceq 'insufficient_quota') { $code = 'provider_quota_exhausted' }
         return [pscustomobject]@{status='failed';failureCode=$code;httpStatus=$response.status;sharing=$sharing}
     }
-    if ($Provider -eq 'Anthropic') {
+    if ($Sharing.provider -eq 'Anthropic') {
         $text = (@($response.body.content | Where-Object type -eq 'text') | ForEach-Object text) -join "`n"
         $truncated = $response.body.stop_reason -eq 'max_tokens'
     } else {
@@ -146,6 +152,42 @@ function Invoke-HandoffAxonExplanation {
     if ([string]::IsNullOrWhiteSpace($text)) { return [pscustomobject]@{status='failed';failureCode=$(if($truncated){'provider_output_limit'}else{'provider_empty_response'});sharing=$sharing} }
     return [pscustomobject]@{status='answered';answer=$text;truncated=[bool]$truncated;sharing=$sharing
         disclaimer='AI explanation of recorded evidence only. Verify against the report and its manual checks; it is not a finding, current state or change approval.'}
+}
+
+# Workspace-only adapter: the host retains prepared requests and checks in-app consent.
+function New-HandoffAxonConversationTurn {
+    param([hashtable]$Scope, [string]$Question, [object[]]$History = @())
+    if ($History.Count -ge 20 -or $History.Count % 2) { throw [ArgumentException]::new('Start a new conversation after ten answered questions.') }
+    for ($i=0; $i -lt $History.Count; $i++) {
+        if ($History[$i].role -cne $(if ($i % 2) {'assistant'} else {'user'}) -or
+            $History[$i].content -isnot [string] -or $History[$i].content.Length -gt 32000) { throw 'Invalid conversation history.' }
+    }
+    $preview = Invoke-HandoffAxonExplanation @Scope -Question $Question -PreviewOnly
+    $messages = @($History | ForEach-Object { @{role=$_.role;content=$_.content} }) + @(@{role='user';content=$preview.user})
+    $system = $preview.system + "`nPrior conversation is context, not independent evidence. Do not claim to refresh data or take actions."
+    $body = if ($Scope.Provider -eq 'Anthropic') {
+        @{model=$Scope.Model;max_tokens=2000;system=$system;messages=$messages}
+    } else {
+        @{model=$Scope.Model;max_completion_tokens=4000;messages=@(@{role='system';content=$system}) + $messages}
+    }
+    $json = ConvertTo-Json -InputObject $body -Depth 16 -Compress
+    $bytes = [Text.Encoding]::UTF8.GetBytes($json)
+    if ($bytes.Length -gt $script:MaxContextBytes) { throw 'Conversation exceeds the 256 KiB sharing limit. Start a new conversation.' }
+    $preview.sharing.bytes = $bytes.Length
+    $preview.sharing.sha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+    $preview.sharing.historyMessages = $History.Count
+    return @{sharing=$preview.sharing;body=$json;uri=(Get-HandoffAxonEndpoint -Provider $Scope.Provider);system=$system;messages=$messages}
+}
+
+function Send-HandoffAxonConversationTurn {
+    param($Prepared, [securestring]$ApiKey)
+    $plainKey = [Net.NetworkCredential]::new('', $ApiKey).Password
+    $headers = if ($Prepared.sharing.provider -eq 'Anthropic') { @{'x-api-key'=$plainKey;'anthropic-version'='2023-06-01'} } else { @{Authorization="Bearer $plainKey"} }
+    try {
+        try { $response = Send-HandoffAxonRequest -Uri $Prepared.uri -Headers $headers -Body $Prepared.body -TimeoutSeconds 120 }
+        catch { return @{status='failed';failureCode='provider_unreachable'} }
+        return ConvertFrom-HandoffAxonResponse -Response $response -Sharing $Prepared.sharing
+    } finally { $plainKey=$null; $headers=$null }
 }
 
 Export-ModuleMember -Function Invoke-HandoffAxonExplanation

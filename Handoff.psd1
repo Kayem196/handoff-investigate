@@ -24,7 +24,9 @@
         'Handoff.psd1', 'Handoff.Investigation.psm1', 'Handoff.Collection.psm1', 'Handoff.Transport.cs',
         'Handoff.Evidence.psm1', 'Handoff.Report.psm1', 'Handoff.Console.psm1', 'Handoff.Axon.psm1', 'report/report.css',
         'examples/group-policy-snapshot.json', 'examples/saved-investigation.ps1',
-        'examples/export-investigation.ps1', 'README.md', 'INSTALL.md', 'docs/USER-TESTING.md', 'LICENSE'
+        'examples/export-investigation.ps1', 'README.md', 'INSTALL.md', 'docs/USER-TESTING.md', 'docs/WORKSPACE.md', 'LICENSE',
+        'Start-Handoff.ps1', 'Handoff.Workspace.psm1', 'workspace/index.html', 'workspace/app.js', 'workspace/app.css',
+        'workspace/mark.svg', 'workspace/Geist.woff2', 'workspace/Geist-OFL.txt'
     )
     PrivateData          = @{ PSData = @{ Prerelease = 'preview1'; Tags = @('Entra', 'Intune', 'ConditionalAccess', 'Investigation', 'ReadOnly') } }
 }
