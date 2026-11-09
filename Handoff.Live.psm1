@@ -27,8 +27,9 @@ function Get-HandoffLiveBinding {
 function ConvertFrom-HandoffDeviceMessage {
     param([string]$Message)
     # Only the known SDK's device message is translated, never raw SDK errors or tokens.
-    if ($Message.Length -le 2000 -and $Message -match 'https://microsoft\.com/devicelogin\b[^\r\n]*?\bcode\s+([A-Z0-9]{8,12})\b') {
-        return @{url='https://microsoft.com/devicelogin';code=$Matches[1]}
+    # SDK 2.38.1 currently prints login.microsoft.com/device; the older address is also official.
+    if ($Message.Length -le 2000 -and $Message -match '(https://(?:login\.microsoft\.com/device|microsoft\.com/devicelogin))(?![\w./-])[^\r\n]*?\bcode\s+([A-Z0-9]{8,12})\b') {
+        return @{url=$Matches[1];code=$Matches[2]}
     }
     return $null
 }

@@ -208,6 +208,7 @@ function renderLive(status) {
   $('reader-progress-text').textContent = live.status === 'authenticating' ? 'Waiting for Microsoft sign-in and reader identity validation…' : live.operation === 'catalog' ? 'Reading the bounded visible group list…' : 'Reading policies and assignments, then saving a new observation…';
   $('device-signin').hidden = !live.device;
   $('device-code').textContent = live.device?.code || '';
+  if (live.device) $('device-link').href = live.device.url; // Host allows only Microsoft's two device-login URLs.
   $('reader-identity').hidden = !live.profile;
   $('reader-identity').textContent = live.profile ? `Tenant: ${live.profile.tenantId}\nReader application: ${live.profile.clientId}\nExpected account: ${live.profile.account}` : '';
   $('reader-connected').hidden = !connected;

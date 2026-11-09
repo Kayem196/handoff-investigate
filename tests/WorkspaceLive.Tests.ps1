@@ -139,6 +139,11 @@ Describe 'Pinned device message translation' {
         $device=& $liveModule $translate 'To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code ABCD12345 to authenticate.'
         $device.url | Should -Be 'https://microsoft.com/devicelogin'
         $device.code | Should -Be 'ABCD12345'
+        # Exact wording printed by SDK 2.38.1 in live testing, 9 November 2026.
+        $current=& $liveModule $translate 'To sign in, use a web browser to open the page https://login.microsoft.com/device and enter the code WXYZ98765 to authenticate.'
+        $current.url | Should -Be 'https://login.microsoft.com/device'
+        $current.code | Should -Be 'WXYZ98765'
+        (& $liveModule $translate 'open https://login.microsoft.com/device.attacker.invalid and enter the code ABCD12345') | Should -BeNullOrEmpty
         (& $liveModule $translate 'Open https://attacker.invalid and enter the code ABCD12345') | Should -BeNullOrEmpty
         (& $liveModule $translate 'raw issuer error with token material') | Should -BeNullOrEmpty
     }

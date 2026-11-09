@@ -90,7 +90,7 @@ function Update-HandoffWorkspaceLive {
             switch -CaseSensitive ($event.kind) {
                 'starting' { if ($connection.operation -cne 'connect') { throw 'invalid_live_event' } }
                 'device' {
-                    if ($connection.status -cne 'authenticating' -or $event.device.url -cne 'https://microsoft.com/devicelogin' -or $event.device.code -cnotmatch '^[A-Z0-9]{8,12}$') { throw 'invalid_live_event' }
+                    if ($connection.status -cne 'authenticating' -or $event.device.url -cnotin @('https://login.microsoft.com/device','https://microsoft.com/devicelogin') -or $event.device.code -cnotmatch '^[A-Z0-9]{8,12}$') { throw 'invalid_live_event' }
                     $connection.device=$event.device
                 }
                 'connected' {

@@ -78,7 +78,7 @@
     </form>
     <p id="reader-identity" class="reader-identity" hidden></p>
     <div id="reader-progress" hidden><progress aria-label="Microsoft reader operation in progress"></progress><p id="reader-progress-text"></p></div>
-    <div id="device-signin" class="device-signin" hidden><p>Open Microsoft’s sign-in page and enter this code:</p><output id="device-code"></output><p><a href="https://microsoft.com/devicelogin" target="_blank" rel="noopener noreferrer">Open Microsoft sign-in</a></p><p class="muted">Use only the expected account shown above. Do not share this code or enter codes supplied by anyone else. Cancel if new consent or an unexpected identity appears.</p></div>
+    <div id="device-signin" class="device-signin" hidden><p>Open Microsoft’s sign-in page and enter this code:</p><output id="device-code"></output><p><a id="device-link" href="https://login.microsoft.com/device" target="_blank" rel="noopener noreferrer">Open Microsoft sign-in</a></p><p class="muted">Use only the expected account shown above. Do not share this code or enter codes supplied by anyone else. Cancel if new consent or an unexpected identity appears.</p></div>
     <div id="reader-connected" hidden>
       <h3>Choose a group to investigate</h3>
       <p>The picker reads up to 200 visible groups, 10 pages and 50 SDK requests, with a 120-second deadline and 4 MiB response limit. It does not read membership, owners, activity or per-group policy counts.</p>
