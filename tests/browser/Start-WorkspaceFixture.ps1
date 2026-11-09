@@ -32,4 +32,35 @@ Unclosed formatting: `literal and **unclosed
         return @{status=200;body=@{choices=@(@{finish_reason='stop';message=@{content=$text}})}}
     }
 }
+& (Get-Module Handoff.Workspace) {
+    param($SnapshotFile)
+    $script:WorkspaceFixtureSnapshotPath=$SnapshotFile
+    # Browser-only fake reader. The normal launcher never imports this fixture.
+    function script:New-HandoffLiveConnection {
+        param($Profile)
+        return @{profile=$Profile;status='authenticating';operation='connect';process=[pscustomobject]@{HasExited=$false};deadline=[datetime]::UtcNow.AddMinutes(2);device=$null;catalog=$null;readTicket=$null;resultId=$null;failureCode=$null;fixturePoll=0}
+    }
+    function script:Receive-HandoffLiveEvents {
+        param($Connection)
+        if ($Connection.status -eq 'authenticating') {
+            $Connection.fixturePoll++
+            if ($Connection.fixturePoll -eq 1) { return @{kind='device';device=@{url='https://microsoft.com/devicelogin';code='ABCD12345'}} }
+            return @{kind='connected';profile=$Connection.profile}
+        }
+        if ($Connection.status -eq 'reading' -and $Connection.operation -eq 'catalog') {
+            return @{kind='catalog';catalog=@{tenantId=$Connection.profile.tenantId;catalogType='visible_group_picker_v1';status='complete';referenceCounts='not_collected';items=@(@{id='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';displayName='Support team'});warning='Fictional bounded group list. Membership and policy counts were not collected.'}}
+        }
+        if ($Connection.status -eq 'reading' -and $Connection.operation -eq 'collect') {
+            $snapshot=Get-Content $script:WorkspaceFixtureSnapshotPath -Raw | ConvertFrom-Json -AsHashtable -DateKind String
+            $snapshot.collectedAt=[datetimeoffset]::UtcNow.ToString('o')
+            return @{kind='snapshot';snapshot=$snapshot}
+        }
+        return @()
+    }
+    function script:Start-HandoffLiveOperation {
+        param($Connection,$Action,$GroupId)
+        $Connection.status='reading';$Connection.operation=$Action;$Connection.resultId=$null
+    }
+    function script:Stop-HandoffLiveConnection { param($Connection) }
+} (Join-Path $PSScriptRoot '../../examples/group-policy-snapshot.json')
 Start-HandoffWorkspace -InvestigationsRoot $FixtureRoot -Port $Port -NoBrowser

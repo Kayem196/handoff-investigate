@@ -1,12 +1,19 @@
 #Requires -Version 7.5
-# Local UI host. No Graph import, filesystem API, generated commands or tenant writes.
+# Local UI host. Graph runs only in a confirmed, isolated reader child.
 $script:Axon = Import-Module (Join-Path $PSScriptRoot 'Handoff.Axon.psm1') -Scope Local -PassThru
 Import-Module (Join-Path $PSScriptRoot 'Handoff.Evidence.psm1') -Scope Local
 Import-Module (Join-Path $PSScriptRoot 'Handoff.Report.psm1') -Scope Local
+Import-Module (Join-Path $PSScriptRoot 'Handoff.Live.psm1') -Scope Local
 
 function New-HandoffWorkspaceState {
-    param([string]$InvestigationsRoot)
-    $state = @{items=@{};history=@{};grants=@{};pending=$null;key=$null;provider='OpenAI';model='gpt-5';warnings=@();selected=$null}
+    param([string]$InvestigationsRoot, [string]$ReaderProfilePath)
+    $state = @{items=@{};history=@{};grants=@{};pending=$null;key=$null;provider='OpenAI';model='gpt-5';warnings=@();selected=$null
+        root=[IO.Path]::GetFullPath($InvestigationsRoot);live=$null;readerDefaults=@{};loadedBytes=0L}
+    if ($ReaderProfilePath) {
+        $profileFile=Get-Item -LiteralPath $ReaderProfilePath -Force
+        if ($profileFile.Length -gt 4096 -or $profileFile.PSIsContainer -or ($profileFile.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Choose an ordinary reader profile JSON file under 4 KiB.' }
+        $state.readerDefaults=ConvertTo-HandoffReaderProfile (Get-Content -LiteralPath $profileFile.FullName -Raw | ConvertFrom-Json -AsHashtable)
+    }
     $sample = Get-Content (Join-Path $PSScriptRoot 'examples/group-policy-snapshot.json') -Raw | ConvertFrom-Json -AsHashtable -DateKind String
     $samplePath = Join-Path ([IO.Path]::GetTempPath()) ('handoff-workspace-sample-' + [guid]::NewGuid().ToString('N'))
     $observation = Save-HandoffInvestigationObservation -Path $samplePath -TenantId $sample.tenantId -GroupId $sample.groupId -Snapshot $sample
@@ -39,19 +46,139 @@ function New-HandoffWorkspaceState {
             } catch { $state.warnings += 'A saved investigation could not be loaded or exceeded the local budget. Its files were not changed.' }
         }
     }
+    $state.loadedBytes=$usedBytes
     return $state
+}
+
+function Get-HandoffWorkspaceLiveSummary {
+    param($State)
+    if (-not $State.live) { return @{status='disconnected';catalog=$null} }
+    return @{status=$State.live.status;operation=$State.live.operation;profile=$State.live.profile;device=$State.live.device
+        catalog=$State.live.catalog;resultId=$State.live.resultId;failureCode=$State.live.failureCode}
+}
+
+function Save-HandoffWorkspaceLiveSnapshot {
+    param($State, [System.Collections.IDictionary]$Snapshot)
+    $connection=$State.live
+    if ($Snapshot.tenantId -ine $connection.profile.tenantId -or $Snapshot.groupId -ine $connection.expectedGroup -or $Snapshot.group.id -ine $connection.expectedGroup) { throw 'reader_binding_failed' }
+    if ($State.items.Count -ge 100) { throw 'workspace_item_limit' }
+    $bytes=[Text.Encoding]::UTF8.GetByteCount((ConvertTo-Json $Snapshot -Depth 64 -Compress -WarningAction Stop))
+    if ($bytes -gt 16MB -or ($State.loadedBytes + 3L*$bytes) -gt 64MB) { throw 'live_result_limit' }
+    $existing=$State.items.Values | Where-Object { -not $_.sample -and $_.scope.TenantId -ieq $Snapshot.tenantId -and $_.scope.GroupId -ieq $Snapshot.groupId } | Sort-Object { $_.report.collectedAt } -Descending | Select-Object -First 1
+    if ($existing) { $journal=$existing.scope.Path }
+    else {
+        $null=New-Item -ItemType Directory -Path $State.root -Force
+        if ((Get-Item -LiteralPath $State.root -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'live_save_failed' }
+        $journal=Join-Path (Join-Path $State.root ([guid]::NewGuid().ToString('D'))) 'evidence'
+    }
+    $observation=Save-HandoffInvestigationObservation -Path $journal -TenantId $Snapshot.tenantId -GroupId $Snapshot.groupId -Snapshot $Snapshot
+    $scope=@{Path=$journal;TenantId=$Snapshot.tenantId;GroupId=$Snapshot.groupId;ObservationId=$observation.id}
+    $report=Get-HandoffInvestigationReport @scope
+    $id='observation-' + $observation.id
+    $State.items[$id]=@{id=$id;sample=$false;scope=$scope;report=$report;fresh=$true}
+    $State.loadedBytes+=(Get-Item -LiteralPath (Join-Path $journal ('observation-' + $observation.id + '.json'))).Length
+    $State.pending=$null
+    return $id # New item/observation means no inherited AI conversation or sharing grant.
+}
+
+function Update-HandoffWorkspaceLive {
+    param($State)
+    $connection=$State.live
+    if (-not $connection -or $connection.status -eq 'failed') { return }
+    try {
+        foreach ($event in @(Receive-HandoffLiveEvents $connection)) {
+            switch -CaseSensitive ($event.kind) {
+                'starting' { if ($connection.operation -cne 'connect') { throw 'invalid_live_event' } }
+                'device' {
+                    if ($connection.status -cne 'authenticating' -or $event.device.url -cne 'https://microsoft.com/devicelogin' -or $event.device.code -cnotmatch '^[A-Z0-9]{8,12}$') { throw 'invalid_live_event' }
+                    $connection.device=$event.device
+                }
+                'connected' {
+                    if ($connection.status -cne 'authenticating' -or $event.profile.tenantId -cne $connection.profile.tenantId -or $event.profile.clientId -cne $connection.profile.clientId -or $event.profile.account -ine $connection.profile.account) { throw 'reader_binding_failed' }
+                    $connection.status='connected'; $connection.device=$null
+                }
+                'catalog' {
+                    $catalog=$event.catalog
+                    if ($connection.operation -cne 'catalog' -or $catalog.tenantId -cne $connection.profile.tenantId -or
+                        $catalog.catalogType -cne 'visible_group_picker_v1' -or $catalog.items -isnot [array] -or $catalog.items.Count -gt 200 -or
+                        $catalog.status -cnotin @('complete','partial','unavailable') -or $catalog.referenceCounts -cne 'not_collected') { throw 'invalid_live_event' }
+                    $seen=[Collections.Generic.HashSet[guid]]::new()
+                    foreach ($group in $catalog.items) {
+                        $id=[guid]::Empty
+                        if (-not [guid]::TryParse([string]$group.id,[ref]$id) -or $id -eq [guid]::Empty -or -not $seen.Add($id) -or
+                            ($null -ne $group.displayName -and ($group.displayName -isnot [string] -or $group.displayName.Length -gt 1024))) { throw 'invalid_live_event' }
+                    }
+                    $connection.catalog=$catalog; $connection.status='connected'; $connection.device=$null
+                }
+                'snapshot' {
+                    if ($connection.operation -cne 'collect' -or $connection.status -cne 'reading') { throw 'invalid_live_event' }
+                    $connection.resultId=Save-HandoffWorkspaceLiveSnapshot -State $State -Snapshot $event.snapshot
+                    $connection.status='connected'
+                }
+                'failed' { throw [InvalidOperationException]::new([string]$event.failureCode) }
+            }
+        }
+        if (($connection.status -in @('authenticating','reading') -and [datetime]::UtcNow -gt $connection.deadline) -or $connection.process.HasExited) { throw 'live_operation_timeout' }
+    } catch {
+        $code=$_.Exception.Message
+        $connection.failureCode=if ($code -in @('sdk_unavailable','reader_binding_failed','group_not_in_catalog','live_result_limit','workspace_item_limit','live_operation_timeout')) { $code } else { 'live_operation_failed' }
+        $connection.status='failed'; $connection.device=$null; $connection.readTicket=$null; $State.pending=$null
+        Stop-HandoffLiveConnection $connection
+    }
 }
 
 function Get-HandoffWorkspaceSummary {
     param($State)
     $items = @($State.items.Values | Sort-Object sample,@{Expression={$_.report.collectedAt};Descending=$true} | ForEach-Object {
-        @{id=$_.id;sample=$_.sample;name=$_.report.group.displayName;groupId=$_.report.groupId;collectedAt=$_.report.collectedAt;coverage=$_.report.coverage;references=$_.report.references.Count}
+        @{id=$_.id;sample=$_.sample;fresh=[bool]$_.fresh;name=$_.report.group.displayName;groupId=$_.report.groupId;collectedAt=$_.report.collectedAt;coverage=$_.report.coverage;references=$_.report.references.Count}
     })
-    return @{items=$items;provider=$State.provider;model=$State.model;keyConfigured=($null -ne $State.key);warnings=$State.warnings}
+    return @{items=$items;provider=$State.provider;model=$State.model;keyConfigured=($null -ne $State.key);warnings=$State.warnings;selected=$State.selected
+        readerDefaults=$State.readerDefaults;live=(Get-HandoffWorkspaceLiveSummary $State)}
 }
 
 function Invoke-HandoffWorkspaceAction {
     param($State, [string]$Action, [System.Collections.IDictionary]$Body)
+    if ($Action -ceq 'live-disconnect') {
+        Stop-HandoffLiveConnection $State.live; $State.live=$null; $State.pending=$null
+        return Get-HandoffWorkspaceLiveSummary $State
+    }
+    Update-HandoffWorkspaceLive $State
+    switch -CaseSensitive ($Action) {
+        'live-status' { return Get-HandoffWorkspaceLiveSummary $State }
+        'live-cancel-review' { if ($State.live) { $State.live.readTicket=$null }; return @{status='cancelled'} }
+        'live-connect' {
+            if ($Body.approveRead -isnot [bool] -or -not $Body.approveRead) { throw [ArgumentException]::new('Review and confirm the reader identity and three read scopes before signing in.') }
+            if ($State.live -and $State.live.status -ne 'failed') { throw [ArgumentException]::new('Disconnect the current reader before connecting another one.') }
+            $profile=ConvertTo-HandoffReaderProfile $Body
+            $State.live=New-HandoffLiveConnection $profile; $State.pending=$null; $State.readerDefaults=$profile
+            return Get-HandoffWorkspaceLiveSummary $State
+        }
+        'live-catalog' {
+            if (-not $State.live -or $State.live.status -cne 'connected' -or $Body.approveRead -isnot [bool] -or -not $Body.approveRead) { throw [ArgumentException]::new('Connect the reader and confirm the bounded group-list read first.') }
+            $State.live.catalog=$null; $State.live.readTicket=$null; $State.pending=$null
+            Start-HandoffLiveOperation $State.live 'catalog'
+            return Get-HandoffWorkspaceLiveSummary $State
+        }
+        'live-prepare' {
+            $connection=$State.live
+            if (-not $connection -or $connection.status -cne 'connected' -or $Body.groupId -isnot [string] -or
+                @($connection.catalog.items | Where-Object id -CEQ $Body.groupId).Count -ne 1) { throw [ArgumentException]::new('Choose a group from the current reader list before collecting policies.') }
+            $group=@($connection.catalog.items | Where-Object id -CEQ $Body.groupId)[0]
+            $ticket=[guid]::NewGuid().ToString('N')
+            $connection.readTicket=@{ticket=$ticket;groupId=$group.id;expires=[datetime]::UtcNow.AddMinutes(5)}
+            $State.pending=$null
+            return @{ticket=$ticket;group=$group;profile=$connection.profile;limits=@{seconds=120;pagesPerCollection=100;items=10000;requests=1000;responseBytes=4MB}}
+        }
+        'live-collect' {
+            $connection=$State.live; $ticket=$connection.readTicket
+            if (-not $connection -or $connection.status -cne 'connected' -or -not $ticket -or $Body.ticket -cne $ticket.ticket -or
+                [datetime]::UtcNow -gt $ticket.expires -or $Body.approveRead -isnot [bool] -or -not $Body.approveRead) { throw [ArgumentException]::new('Review the exact group and confirm a fresh policy read; the earlier confirmation may have expired.') }
+            $connection.expectedGroup=$ticket.groupId; $connection.readTicket=$null; $State.pending=$null
+            Start-HandoffLiveOperation $connection 'collect' $ticket.groupId
+            return Get-HandoffWorkspaceLiveSummary $State
+        }
+    }
+    if ($Action -cin @('prepare','send') -and $State.live -and $State.live.status -in @('authenticating','reading')) { throw [ArgumentException]::new('Finish or cancel the Microsoft read before sharing an AI request.') }
     switch ($Action) {
         'state' { return Get-HandoffWorkspaceSummary $State }
         'provider' {
@@ -74,7 +201,7 @@ function Invoke-HandoffWorkspaceAction {
     switch ($Action) {
         'investigation' {
             $State.selected=$Body.id; $State.pending=$null
-            return @{report=$item.report;sample=$item.sample;messages=@($State.history[$Body.id] | Where-Object { $null -ne $_ });approved=$State.grants.ContainsKey($Body.id)}
+            return @{report=$item.report;sample=$item.sample;fresh=[bool]$item.fresh;messages=@($State.history[$Body.id] | Where-Object { $null -ne $_ });approved=$State.grants.ContainsKey($Body.id)}
         }
         'reset' {
             $State.history.Remove($Body.id); $State.grants.Remove($Body.id); $State.pending=$null
@@ -122,8 +249,8 @@ function Test-HandoffWorkspaceRequest {
 
 function Start-HandoffWorkspace {
     [CmdletBinding()]
-    param([string]$InvestigationsRoot = (Join-Path $env:LOCALAPPDATA 'Handoff/Investigations'), [ValidateRange(1024,65535)][int]$Port=43187, [switch]$NoBrowser)
-    $state = New-HandoffWorkspaceState $InvestigationsRoot
+    param([string]$InvestigationsRoot = (Join-Path $env:LOCALAPPDATA 'Handoff/Investigations'), [ValidateRange(1024,65535)][int]$Port=43187, [switch]$NoBrowser, [string]$ReaderProfilePath)
+    $state = New-HandoffWorkspaceState -InvestigationsRoot $InvestigationsRoot -ReaderProfilePath $ReaderProfilePath
     $token = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLowerInvariant()
     $origin="http://127.0.0.1:$Port"
     $listener=[Net.HttpListener]::new(); $listener.Prefixes.Add("$origin/")
@@ -178,6 +305,7 @@ function Start-HandoffWorkspace {
             } finally { $response.Close() }
         }
     } finally {
+        Stop-HandoffLiveConnection $state.live
         if ($state.key) { $state.key.Dispose(); $state.key=$null }
         $state.history.Clear(); $state.pending=$null; $state.grants.Clear()
         $listener.Close()

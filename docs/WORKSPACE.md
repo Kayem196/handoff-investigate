@@ -1,4 +1,4 @@
-# Handoff workspace: first graphical slice
+# Handoff workspace
 
 From the standalone source directory, run:
 
@@ -38,15 +38,36 @@ context and selected evidence. Changing provider settings, starting a new
 conversation or forgetting the key revokes the relevant approval and history.
 Different investigations have separate conversations and approvals.
 
+## Live Microsoft 365 reads
+
+**Microsoft 365** in the sidebar connects the dedicated reader registration from
+[INSTALL.md](../INSTALL.md#2-create-a-dedicated-reader-registration-one-time-per-tenant).
+Enter the tenant ID, reader client ID and expected account, confirm you reviewed
+its three read scopes, then sign in with the Microsoft device code shown in the
+app. `-ReaderProfilePath <json>` pre-fills those three values from a local file
+with `tenantId`, `clientId` and `account`; it contains no secrets.
+
+- Sign-in runs in a separate hidden PowerShell process that alone loads
+  `Microsoft.Graph.Authentication` 2.38.1, with an in-memory (Process) token
+  cache. The UI host never imports Graph or sees tokens. A session whose tenant,
+  client, account or scopes differ from the reviewed profile is rejected.
+- **Read visible group list** is a separate confirmed action (up to 200 groups).
+  Choosing a group opens a review of the exact group, tenant and limits;
+  **Collect & save evidence** then reads CA and compliance policies once.
+- Each collection appends a new observation to that group's local investigation.
+  Earlier evidence and chats are unchanged; the new observation starts with no
+  conversation and needs its own sharing approval. Chat cannot trigger reads.
+- **Cancel sign-in**, closing the dialog during an operation, **Disconnect reader**
+  or **Stop workspace** ends the reader process. This does not call
+  `Disconnect-MgGraph`, so other Microsoft tools stay signed in.
+- Failures show fixed messages; raw SDK or issuer text is never shown or saved.
+
 ## Important limits
 
-**This is saved-evidence conversation, not the completed live investigation agent.**
-The workspace does not sign in, load Graph, refresh an observation, discover
-unsaved groups, resolve additional directory names or run tenant operations.
-The supported live-read UI/tools are the next slice, not a hidden capability.
-For now, collect through the [read-only guide](../INSTALL.md#3-run-an-investigation),
-then restart the workspace to load the new saved evidence. It loads the newest
-observation from each accepted investigation folder, not arbitrary uploaded reports.
+Chat discusses the selected saved observation; it does not run reads itself,
+resolve additional directory names (excluded groups, roles, apps) or make changes.
+Those follow-up reads are future, separately confirmed actions. At start-up the
+workspace loads the newest observation from each accepted investigation folder.
 
 CA and Intune device compliance remain the only supported policy families. Neither
 chat nor evidence can prove safe deletion, effective population or lockout impact.
@@ -90,7 +111,10 @@ bounded conversation history, key exclusion and host/origin/session guards.
 `tests/browser/verify-workspace.mjs` starts a fictional-only host with a fake
 provider, exercises HTTP and browser flows, and saves desktop/mobile screenshots.
 See [browser checks](../tests/browser/README.md). No real key, provider request or
-tenant operation is used by that browser suite.
+tenant operation is used by that browser suite. `tests/WorkspaceLive.Tests.ps1`
+checks reader confirmation, identity binding, catalog-bound one-use read tickets,
+append-only saving and AI isolation, and runs the real worker protocol offline
+in a fresh process (`tests/live/Test-WorkerProtocol.ps1`) with stubbed Graph.
 
 The UI reuses Handoff's approved violet/white palette and exact mark geometry.
 The bundled Geist font is unchanged from the wider app and retains its separate

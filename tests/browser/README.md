@@ -13,7 +13,9 @@ node ./public-handoff/tests/browser/verify-workspace.mjs `
 In the standalone repository, omit `public-handoff/` from the script path.
 The suite starts a test-owned PowerShell host with fictional/hostile fixtures
 and a fake provider sender. It does not change the production launcher or
-contact a provider. Its 30 checks cover HTTP origin/token/body-size guards,
+contact a provider or tenant (the Microsoft reader is also faked). Its 41 checks
+cover in-app device sign-in, confirmed group listing and policy reads, append-only
+fresh observations and reader cancellation, plus HTTP origin/token/body-size guards,
 safe tenant/model text, friendly policy names, collapsed technical evidence,
 responsive layouts, dialog keyboard focus, key clearing, sharing cancellation,
 multi-turn context, investigation isolation, revocation, semantic answer tables,

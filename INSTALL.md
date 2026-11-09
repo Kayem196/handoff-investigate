@@ -59,9 +59,10 @@ To open the graphical workspace instead:
 
 Use **AI settings** inside the workspace for an optional OpenAI/Anthropic key.
 No evidence is sent while adding the key. The first question asks for sharing
-approval for that saved investigation, provider and model. The workspace has
-no live tenant connection in this slice; the collection steps below remain
-separate. Use **Stop workspace** to forget the session and stop the local host.
+approval for that saved investigation, provider and model. After completing
+the reader registration in step 2, use **Microsoft 365** in the workspace to sign
+in and collect fresh evidence; the console guide in step 3 remains an alternative.
+Use **Stop workspace** to forget the session and stop the local host.
 
 For live collection, install the pinned authentication module:
 

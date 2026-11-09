@@ -23,17 +23,18 @@
       </details>
       <p class="sidebar-note">Investigations stay on this computer. No Handoff account or cloud workspace.</p>
       <div class="sidebar-bottom">
+        <button id="connect-open" class="sidebar-button" type="button"><span aria-hidden="true">◇</span> Microsoft 365 <span id="reader-status" class="small-badge">Not connected</span></button>
         <button id="settings-open" class="sidebar-button" type="button"><span aria-hidden="true">⚙</span> AI settings <span id="key-status" class="small-badge">Not set</span></button>
         <button id="stop-open" class="sidebar-button subtle" type="button">Stop workspace</button>
         <span class="preview-label">Handoff Investigate · UI preview</span>
       </div>
     </aside>
     <div class="work-area">
-      <header class="topbar"><div><strong>Investigate</strong><span class="topbar-description">Understand the relationships behind your configuration</span></div><span class="local-status"><span aria-hidden="true"></span> Saved evidence, not live</span></header>
+      <header class="topbar"><div><strong>Investigate</strong><span class="topbar-description">Understand the relationships behind your configuration</span></div><span id="connection-status" class="local-status"><span aria-hidden="true"></span> Saved evidence, not live</span></header>
       <div id="notice" role="status" class="notice" hidden></div>
       <div class="content-layout">
         <main class="conversation">
-          <header class="conversation-heading"><div><span id="source-label" class="eyebrow">Choose an investigation</span><h1 id="conversation-title" tabindex="-1">Let’s understand your infrastructure.</h1><p id="selection-detail">Start with a saved group investigation or explore the fictional example.</p></div><button id="new-chat" class="quiet-button" type="button">New conversation</button></header>
+          <header class="conversation-heading"><div><span id="source-label" class="eyebrow">Choose an investigation</span><h1 id="conversation-title" tabindex="-1">Let’s understand your infrastructure.</h1><p id="selection-detail">Start with a saved group investigation or explore the fictional example.</p></div><div class="heading-actions"><button id="read-refresh" class="quiet-button" type="button">Collect fresh evidence</button><button id="new-chat" class="quiet-button" type="button">New conversation</button></div></header>
           <div id="conversation-scroll" class="conversation-scroll">
             <div id="welcome" class="welcome">
               <img src="/mark.svg" width="42" height="42" alt="">
@@ -54,7 +55,7 @@
               <label for="question">Ask Handoff</label>
               <div class="composer"><textarea id="question" name="question" maxlength="4000" rows="2" placeholder="What would you like to know about this group?" required aria-describedby="composer-help"></textarea><button id="send" type="submit" class="primary">Send <span aria-hidden="true">↑</span></button></div>
             </form>
-            <p id="composer-help">Enter to send · Shift + Enter for a new line. No live reads or tenant changes in this preview.</p>
+            <p id="composer-help">Enter to send · Shift + Enter for a new line. Chat uses the selected saved observation; Microsoft reads require separate confirmation.</p>
             <p id="sharing-status" class="sharing-status">AI is optional. Evidence is available without a provider key.</p>
           </div>
         </main>
@@ -64,6 +65,37 @@
       </div>
     </div>
   </div>
+  <dialog id="connection" aria-labelledby="connection-title">
+    <div class="dialog-heading"><h2 id="connection-title">Connect your Microsoft 365 reader</h2><button class="close-button" type="button" data-close="connection" aria-label="Close Microsoft connection">×</button></div>
+    <p>Microsoft sign-in is separate from AI sharing. Handoff uses your dedicated tenant-owned registration, with delegated read access only. It cannot change your tenant.</p>
+    <form id="reader-form" action="/" method="post">
+      <label for="tenant-id">Tenant ID</label><input id="tenant-id" name="tenantId" required pattern="[0-9a-fA-F\-]{36}" maxlength="36" autocomplete="off" spellcheck="false">
+      <label for="reader-client">Reader application (client) ID</label><input id="reader-client" name="clientId" required pattern="[0-9a-fA-F\-]{36}" maxlength="36" autocomplete="off" spellcheck="false">
+      <label for="reader-account">Expected Microsoft sign-in account</label><input id="reader-account" name="account" type="email" maxlength="254" required autocomplete="username" spellcheck="false" autocapitalize="off">
+      <details class="permission-details"><summary>Review the three requested read scopes</summary><ul><li>GroupMember.Read.All</li><li>Policy.Read.All</li><li>DeviceManagementConfiguration.Read.All</li></ul><p>No member list, role-holder, sign-in log or app-directory expansion is part of this read. Stop if Microsoft asks for new consent or shows another tenant, account or application.</p></details>
+      <label class="review-check"><input id="reader-reviewed" name="reviewed" type="checkbox" required> I have reviewed this dedicated reader and its existing consent for these three scopes.</label>
+      <div class="dialog-actions"><button class="primary" type="submit">Sign in with Microsoft</button></div>
+    </form>
+    <p id="reader-identity" class="reader-identity" hidden></p>
+    <div id="reader-progress" hidden><progress aria-label="Microsoft reader operation in progress"></progress><p id="reader-progress-text"></p></div>
+    <div id="device-signin" class="device-signin" hidden><p>Open Microsoft’s sign-in page and enter this code:</p><output id="device-code"></output><p><a href="https://microsoft.com/devicelogin" target="_blank" rel="noopener noreferrer">Open Microsoft sign-in</a></p><p class="muted">Use only the expected account shown above. Do not share this code or enter codes supplied by anyone else. Cancel if new consent or an unexpected identity appears.</p></div>
+    <div id="reader-connected" hidden>
+      <h3>Choose a group to investigate</h3>
+      <p>The picker reads up to 200 visible groups, 10 pages and 50 SDK requests, with a 120-second deadline and 4 MiB response limit. It does not read membership, owners, activity or per-group policy counts.</p>
+      <button id="live-list" class="quiet-button" type="button">Read visible group list</button>
+      <div id="live-picker" hidden><p id="catalog-status"></p><label for="live-search">Filter the retained group list</label><input id="live-search" type="search" autocomplete="off" placeholder="Find a group by name…"><label for="live-groups">Group (names are labels; check the ID)</label><select id="live-groups" size="6"></select><div class="dialog-actions"><button id="live-review" class="primary" type="button">Review policy read</button></div></div>
+    </div>
+    <p id="reader-error" role="alert" class="inline-error" hidden></p>
+    <div class="dialog-actions"><button id="live-disconnect" class="quiet-button" type="button" hidden>Disconnect reader</button></div>
+  </dialog>
+  <dialog id="read-review" aria-labelledby="read-review-title">
+    <div class="dialog-heading"><h2 id="read-review-title">Collect fresh policy evidence?</h2><button class="close-button" type="button" data-close="read-review" aria-label="Cancel policy read">×</button></div>
+    <p id="read-review-identity"></p><p id="read-review-group"></p>
+    <p>This resolves the exact group and reads visible Conditional Access policies, Intune device-compliance policies and their assignments. It does not evaluate membership or predict who is affected.</p>
+    <p>Limits: 120 seconds, 100 pages per collection, 10,000 retained items, 1,000 SDK requests, 4 MiB per response. Intune assignments use the previously verified beta endpoint to retain filter metadata.</p>
+    <p>A new immutable observation is saved locally. Earlier evidence and chats stay available. AI does not receive the new evidence automatically; the new observation needs its own sharing approval.</p>
+    <div class="dialog-actions"><button class="quiet-button" type="button" data-close="read-review" autofocus>Keep current evidence</button><button id="live-collect" class="primary" type="button">Collect & save evidence</button></div>
+  </dialog>
   <dialog id="settings" aria-labelledby="settings-title">
     <form id="settings-form" action="/" method="post">
       <div class="dialog-heading"><h2 id="settings-title">AI settings</h2><button class="close-button" type="button" data-close="settings" aria-label="Close AI settings">×</button></div>

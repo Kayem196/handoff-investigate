@@ -27,9 +27,10 @@ expandable evidence and multi-turn chat. Add an OpenAI or Anthropic key in
 example works for browsing without a key. No raw payload file or terminal chat
 is needed.
 
-**This first UI slice uses saved evidence, not a live tenant connection.**
-Live discovery/collection still uses the read-only PowerShell guide below;
-chat cannot perform those reads yet. Conversation history and keys stay in
+**Microsoft 365** in the sidebar signs in your dedicated read-only reader, lists
+visible groups and collects fresh evidence, each step confirmed in the app. Chat
+discusses the selected saved observation; it cannot run reads or make changes.
+Conversation history and keys stay in
 the local host's memory for this session. See the
 [workspace guide and security boundary](docs/WORKSPACE.md).
 
