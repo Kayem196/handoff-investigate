@@ -62,6 +62,21 @@ with `tenantId`, `clientId` and `account`; it contains no secrets.
   `Disconnect-MgGraph`, so other Microsoft tools stay signed in.
 - Failures show fixed messages; raw SDK or issuer text is never shown or saved.
 
+## Friendly names
+
+Evidence and chat show names instead of IDs where Handoff can establish them:
+
+- **Groups and assignment filters** (name, platform and rule) referenced by the
+  collected policies are read during a fresh collection, using the same three
+  scopes: up to 50 groups (`v1.0/groups/{id}`) and 25 filters (beta
+  `assignmentFilters/{id}`). Failures are listed as unresolved, never guessed,
+  and do not change coverage. Older observations need a fresh read for these.
+- **Built-in directory roles and well-known Microsoft apps** come from
+  `data/well-known-names.json`, generated from Microsoft Learn by
+  `tools/Update-WellKnownNames.ps1`. These IDs are identical in every tenant.
+- **Not resolved:** custom roles, other applications and individual users, which
+  would need additional permissions. They stay as IDs, marked unresolved.
+
 ## Important limits
 
 Chat discusses the selected saved observation; it does not run reads itself,

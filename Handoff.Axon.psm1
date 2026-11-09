@@ -14,7 +14,7 @@ Rules:
 - Distinguish configured targeting from group membership and runtime applicability.
 - You cannot run commands, read more data or change the tenant. When more evidence is needed, point to the report's manual checks.
 - Answer in plain English for an IT administrator, concisely.
-- Prefer friendly group and policy names supplied in the evidence. Never guess a name for an unresolved ID; keep IDs available for verification rather than leading with them.
+- Use the names in "names" (groups, roles, applications, assignment filters) and policy displayName instead of IDs, e.g. "Global Administrator" rather than a role ID. Show an ID only when it is listed as unresolved or the user asks; say it is unresolved rather than guessing. Never invent a name.
 '@
 
 function New-HandoffAxonContext {
@@ -34,6 +34,7 @@ function New-HandoffAxonContext {
         sources=$Report.sources;references=$Report.references;issues=$Report.issues;context=$Report.context
         manualChecks=@($Report.manualChecks | ForEach-Object { [ordered]@{title=$_.title;unknown=$_.unknown;consequence=$_.consequence;verify=$_.verify} })
         policies=@($policies)
+        names=$Report.names
     }
     if ($IncludeNotes) { $context.notes = @($Report.notes | ForEach-Object { [ordered]@{savedAt=$_.savedAt;text=$_.text} }) }
     if ($Report.comparison) { $context.comparisonSummary = [ordered]@{summary=$Report.comparison.summary;coverageBefore=$Report.comparison.coverageBefore;coverageAfter=$Report.comparison.coverageAfter;verification=$Report.comparison.verification} }

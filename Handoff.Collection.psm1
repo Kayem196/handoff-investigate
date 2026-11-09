@@ -132,6 +132,42 @@ function Read-HandoffGraphCollection {
     }
 }
 
+function Get-HandoffDirectoryNames {
+    # Presentation only: names never change references or coverage. Same three read scopes.
+    param([hashtable]$State, $ConditionalAccess, $Compliance, [guid]$GroupId)
+    $groups = [Collections.Generic.HashSet[guid]]::new(); $filters = [Collections.Generic.HashSet[guid]]::new()
+    $add = { param($set, $value) $id = [guid]::Empty; if ([guid]::TryParse([string]$value, [ref]$id) -and $id -ne [guid]::Empty -and $id -ne $GroupId) { $null = $set.Add($id) } }
+    foreach ($policy in $ConditionalAccess.policies) { foreach ($key in 'includeGroups','excludeGroups') { foreach ($id in @($policy.conditions.users.$key)) { & $add $groups $id } } }
+    foreach ($policy in $Compliance.policies) { foreach ($assignment in @($policy.assignments)) {
+        & $add $groups $assignment.target.groupId; & $add $filters $assignment.target.deviceAndAppManagementAssignmentFilterId } }
+    $names = @{ groups = @{}; filters = @{}; unresolved = [Collections.Generic.List[object]]::new(); limits = @{ groups = 50; filters = 25 } }
+    $requests = @(@($groups | Select-Object -First 50 | ForEach-Object { @{ kind = 'group'; id = $_; uri = "https://graph.microsoft.com/v1.0/groups/$_" + '?$select=id,displayName' } }) +
+        @($filters | Select-Object -First 25 | ForEach-Object { @{ kind = 'filter'; id = $_; uri = "https://graph.microsoft.com/beta/deviceManagement/assignmentFilters/$_" } }))
+    foreach ($skipped in @(@($groups | Select-Object -Skip 50) + @($filters | Select-Object -Skip 25))) { $names.unresolved.Add(@{ id = $skipped.ToString(); code = 'name_limit' }) }
+    foreach ($request in $requests) {
+        $item = $null; $code = $null
+        if ($State.budget.Expired) { $code = 'deadline_exceeded' }
+        else {
+            try { $item = Invoke-HandoffGraphRead -Uri $request.uri -State $State }
+            catch [System.Security.SecurityException] { throw }
+            catch { $State.cancellation.ThrowIfCancellationRequested(); $code = $(if ($_.Exception.Message -in @('request_limit','response_limit','redirect_rejected','deadline_exceeded')) { $_.Exception.Message } else { 'request_failed' }) }
+        }
+        $returned = [guid]::Empty
+        if (-not $code -and ($item -isnot [System.Collections.IDictionary] -or -not [guid]::TryParse([string]$item.id, [ref]$returned) -or $returned -ne $request.id -or
+            $item.displayName -isnot [string] -or $item.displayName.Length -gt 1024)) { $code = 'invalid_name_response' }
+        if ($code) { $names.unresolved.Add(@{ id = $request.id.ToString(); kind = $request.kind; code = $code }); continue }
+        if ($request.kind -eq 'group') { $names.groups[$request.id.ToString()] = $item.displayName }
+        else {
+            $filter = @{ displayName = $item.displayName }
+            foreach ($key in 'platform','rule') { if ($item[$key] -is [string] -and $item[$key].Length -le 8192) { $filter[$key] = $item[$key] } }
+            $names.filters[$request.id.ToString()] = $filter
+        }
+    }
+    $names.status = $(if ($names.unresolved.Count) { 'partial' } else { 'complete' })
+    $names.unresolved = $names.unresolved.ToArray()
+    return $names
+}
+
 function Get-HandoffPolicySnapshot {
     [CmdletBinding()]
     param(
@@ -178,15 +214,17 @@ function Get-HandoffPolicySnapshot {
                 if (-not $compliance.failureCode) { $compliance.failureCode = 'assignments_incomplete' }
             }
         }
+        $directoryNames = Get-HandoffDirectoryNames -State $state -ConditionalAccess $ca -Compliance $compliance -GroupId $GroupId
         $CancellationToken.ThrowIfCancellationRequested()
         if ((Get-HandoffGraphBinding -TenantId $TenantId) -cne $state.binding) {
             throw [System.Security.SecurityException]::new('The Graph session changed; discard this collection.')
         }
         return @{
+            directoryNames = $directoryNames
             schemaVersion = 1; tenantId = $TenantId.ToString(); groupId = $GroupId.ToString()
             group = $group; collectedAt = $started
             collection = @{ source = 'graph_v1_beta_delegated_policy_snapshot_v1'; completedAt = [datetimeoffset]::UtcNow.ToString('o')
-                apiVersions = @{ group = 'v1.0'; conditionalAccess = 'v1.0'; compliancePolicies = 'v1.0'; complianceAssignments = 'beta' }
+                apiVersions = @{ group = 'v1.0'; conditionalAccess = 'v1.0'; compliancePolicies = 'v1.0'; complianceAssignments = 'beta'; directoryNames = 'v1.0 groups, beta assignmentFilters' }
                 transport = 'sdk_2.38.1_streamed_request_options_v1'
                 requestCount = $state.requestCount; retainedItems = $state.retainedItems; limits = @{ pagesPerCollection = $MaxPages; retainedItems = $MaxItems; sdkInvocations = $MaxRequests; responseBytes = $MaxResponseBytes; durationSeconds = $TimeoutSeconds } }
             conditionalAccess = $ca; compliance = $compliance

@@ -3,6 +3,34 @@
 Import-Module (Join-Path $PSScriptRoot 'Handoff.Evidence.psm1') -Scope Local
 $script:MaxExportBytes = 32MB
 
+$script:WellKnownNames = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'data/well-known-names.json') -Raw | ConvertFrom-Json -AsHashtable
+
+function Get-HandoffNameIndex {
+    # Names only for IDs present in the included evidence; IDs stay authoritative.
+    param([System.Collections.IDictionary]$Snapshot, $Policies)
+    $collected = $Snapshot.directoryNames
+    $index = [ordered]@{groups=[ordered]@{};roles=[ordered]@{};applications=[ordered]@{};filters=[ordered]@{};unresolved=@()
+        status=$(if ($collected) { $collected.status } else { 'not_collected' })
+        note='Group and filter names were read when this observation was collected. Role and application names are built-in Microsoft values from Microsoft Learn. Custom roles, other applications and users are not resolved.'}
+    $json = ConvertTo-Json -InputObject @($Policies) -Depth 64 -Compress
+    foreach ($match in [regex]::Matches($json, '(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')) {
+        $id = $match.Value.ToLowerInvariant()
+        if ($id -eq [string]$Snapshot.group.id -and $Snapshot.group.displayName) { $index.groups[$id] = $Snapshot.group.displayName }
+        elseif ($collected -and $collected.groups.Contains($id)) { $index.groups[$id] = $collected.groups[$id] }
+        elseif ($collected -and $collected.filters.Contains($id)) { $index.filters[$id] = $collected.filters[$id] }
+        elseif ($script:WellKnownNames.roles.Contains($id)) { $index.roles[$id] = $script:WellKnownNames.roles[$id] }
+        elseif ($script:WellKnownNames.applications.Contains($id)) { $index.applications[$id] = $script:WellKnownNames.applications[$id] }
+    }
+    $named = @($index.groups.Keys) + @($index.roles.Keys) + @($index.applications.Keys) + @($index.filters.Keys)
+    $targets = foreach ($policy in $Policies) {
+        $c = $policy.configuration
+        foreach ($set in @($c.conditions.users, $c.conditions.applications)) { foreach ($key in @('includeGroups','excludeGroups','includeRoles','excludeRoles','includeApplications','excludeApplications')) { if ($set -is [System.Collections.IDictionary]) { $set[$key] } } }
+        foreach ($a in @($c.assignments)) { $a.target.groupId; $a.target.deviceAndAppManagementAssignmentFilterId }
+    }
+    $index.unresolved = @($targets | Where-Object { $_ -is [string] -and $_ -match '^[0-9a-fA-F-]{36}$' -and $_.ToLowerInvariant() -notin $named } | ForEach-Object { $_.ToLowerInvariant() } | Sort-Object -Unique)
+    return $index
+}
+
 function Get-HandoffInvestigationReport {
     [CmdletBinding()]
     param(
@@ -94,6 +122,7 @@ function Get-HandoffInvestigationReport {
         summary=$summary;canConcludeNoExplicitReferences=$evaluation.canConcludeNoExplicitReferences
         sources=@($sources);references=@($references);issues=@($evaluation.issues);context=@($evaluation.context)
         manualChecks=$checks.ToArray();policyEvidence=$policies.ToArray();collection=$observation.snapshot.collection
+        names=(Get-HandoffNameIndex -Snapshot $observation.snapshot -Policies $policies.ToArray())
         notes=@($saved.notes | Where-Object observationId -CEQ $observation.id | ForEach-Object { [ordered]@{id=$_.id;savedAt=$_.savedAt;text=$_.text} })
         comparison=$comparison
         disclosure='Private tenant evidence and unverified notes. Contains the selected observation, its attached notes and policies matched to referenced or flagged IDs, plus an optional explicit comparison. Invalid or missing IDs may prevent evidence matching. Not a full raw snapshot, current live state, signed audit record or deletion approval. Review before sharing.'

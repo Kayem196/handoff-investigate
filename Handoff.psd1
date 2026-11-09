@@ -22,7 +22,7 @@
     AliasesToExport      = @()
     FileList             = @(
         'Handoff.psd1', 'Handoff.Investigation.psm1', 'Handoff.Collection.psm1', 'Handoff.Transport.cs',
-        'Handoff.Evidence.psm1', 'Handoff.Report.psm1', 'Handoff.Console.psm1', 'Handoff.Axon.psm1', 'report/report.css',
+        'Handoff.Evidence.psm1', 'Handoff.Report.psm1', 'Handoff.Console.psm1', 'Handoff.Axon.psm1', 'report/report.css', 'data/well-known-names.json',
         'examples/group-policy-snapshot.json', 'examples/saved-investigation.ps1',
         'examples/export-investigation.ps1', 'README.md', 'INSTALL.md', 'docs/USER-TESTING.md', 'docs/WORKSPACE.md', 'LICENSE',
         'Start-Handoff.ps1', 'Handoff.Workspace.psm1', 'Handoff.Live.psm1', 'workspace/Invoke-LiveWorker.ps1', 'workspace/index.html', 'workspace/app.js', 'workspace/app.css',

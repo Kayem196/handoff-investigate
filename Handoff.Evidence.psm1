@@ -90,7 +90,7 @@ function Read-HandoffEvidenceRecord {
 function Get-HandoffSavedEvaluation {
     param([guid]$TenantId, [guid]$GroupId, [System.Collections.IDictionary]$Snapshot)
     foreach ($key in $Snapshot.Keys) {
-        if ($key -cnotin @('schemaVersion','tenantId','groupId','group','collectedAt','collection','conditionalAccess','compliance')) { throw 'Only a policy snapshot may be saved, not authentication or arbitrary session data.' }
+        if ($key -cnotin @('schemaVersion','tenantId','groupId','group','collectedAt','collection','conditionalAccess','compliance','directoryNames')) { throw 'Only a policy snapshot may be saved, not authentication or arbitrary session data.' }
     }
     foreach ($candidate in @($Snapshot.groupId, $Snapshot.group.id)) {
         if ($null -ne $candidate) {

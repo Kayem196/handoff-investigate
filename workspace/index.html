@@ -91,7 +91,7 @@
   <dialog id="read-review" aria-labelledby="read-review-title">
     <div class="dialog-heading"><h2 id="read-review-title">Collect fresh policy evidence?</h2><button class="close-button" type="button" data-close="read-review" aria-label="Cancel policy read">×</button></div>
     <p id="read-review-identity"></p><p id="read-review-group"></p>
-    <p>This resolves the exact group and reads visible Conditional Access policies, Intune device-compliance policies and their assignments. It does not evaluate membership or predict who is affected.</p>
+    <p>This resolves the exact group and reads visible Conditional Access policies, Intune device-compliance policies and their assignments. It also reads the names of other groups and assignment filters those policies reference (up to 50 and 25). It does not evaluate membership or predict who is affected.</p>
     <p>Limits: 120 seconds, 100 pages per collection, 10,000 retained items, 1,000 SDK requests, 4 MiB per response. Intune assignments use the previously verified beta endpoint to retain filter metadata.</p>
     <p>A new immutable observation is saved locally. Earlier evidence and chats stay available. AI does not receive the new evidence automatically; the new observation needs its own sharing approval.</p>
     <div class="dialog-actions"><button class="quiet-button" type="button" data-close="read-review" autofocus>Keep current evidence</button><button id="live-collect" class="primary" type="button">Collect & save evidence</button></div>

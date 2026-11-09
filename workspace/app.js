@@ -152,9 +152,31 @@ function renderEvidence(report, sample) {
     block.append(element('span', `${reference.relation === 'exclude' ? 'Excludes' : 'Includes'} this group · ${family}`, 'relation'));
     const states = { disabled: 'Disabled — configuration reference, not enforcement', enabledForReportingButNotEnforced: 'Report-only — not enforced', enabled: 'Enabled — applicability still needs verification' };
     if (policy?.configuration?.state) block.append(element('p', states[policy.configuration.state] || `Recorded state: ${policy.configuration.state}`));
-    if (reference.filter?.id || reference.filter?.type) block.append(element('p', `Assignment filter: ${reference.filter.type || 'mode not recorded'}. Its name and rule were not collected.`));
+    if (reference.filter?.id || reference.filter?.type) {
+      const filter = report.names?.filters?.[String(reference.filter.id).toLowerCase()];
+      block.append(element('p', filter ? `Assignment filter (${reference.filter.type || 'mode not recorded'}): ${filter.displayName}${filter.platform ? ` · ${filter.platform}` : ''}` : `Assignment filter: ${reference.filter.type || 'mode not recorded'}. Its name was not collected in this observation.`));
+      if (filter?.rule) block.append(element('p', `Rule: ${filter.rule}`, 'filter-rule'));
+    }
     technical(block, 'View supporting evidence', { reference, configuration: policy?.configuration ?? 'Policy evidence not available' });
     relationships.append(block);
+  }
+  const names = report.names;
+  if (names) {
+    const known = section('Named objects in these policies');
+    const labels = { groups: 'Groups', roles: 'Directory roles', applications: 'Applications' };
+    let any = false;
+    for (const [kind, label] of Object.entries(labels)) {
+      const values = Object.values(names[kind] || {});
+      if (!values.length) continue;
+      any = true;
+      known.append(element('h3', label));
+      const list = element('ul', undefined, 'name-list');
+      for (const value of values) list.append(element('li', value));
+      known.append(list);
+    }
+    if (!any) known.append(element('p', 'No referenced objects could be named.'));
+    if (names.unresolved?.length) known.append(element('p', `${names.unresolved.length} referenced ID${names.unresolved.length === 1 ? '' : 's'} could not be named${names.status === 'not_collected' ? '; collect fresh evidence to resolve group and filter names' : ''}. Custom roles, other apps and users are not resolved.`));
+    technical(known, 'Unresolved IDs', names.unresolved || []);
   }
   const checks = section('Before you make a change');
   const list = element('ul', undefined, 'manual-checks');
