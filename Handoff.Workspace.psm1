@@ -156,7 +156,7 @@ function Start-HandoffWorkspace {
                     # Bound both size and read time before JSON parsing.
                     $inputBytes=[byte[]]::new([int]$request.ContentLength64)
                     $deadline=[Threading.CancellationTokenSource]::new([timespan]::FromSeconds(5))
-                    try { $request.InputStream.ReadExactlyAsync([Memory[byte]]$inputBytes,$deadline.Token).AsTask().GetAwaiter().GetResult() }
+                    try { $null=$request.InputStream.ReadExactlyAsync([Memory[byte]]$inputBytes,$deadline.Token).AsTask().GetAwaiter().GetResult() }
                     finally { $deadline.Dispose() }
                     $body=[Text.Encoding]::UTF8.GetString($inputBytes) | ConvertFrom-Json -AsHashtable -Depth 8
                     if ($body -isnot [System.Collections.IDictionary]) { throw [ArgumentException]::new('Expected a workspace request object.') }
