@@ -1,0 +1,8 @@
+# Never commit tenant evidence, exports or test output.
+testResults.xml
+*.handoff-staging-*.tmp
+.handoff-export-*.tmp
+.handoff-write.lock
+investigations/
+exports/
+results-*/

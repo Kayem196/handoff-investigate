@@ -1,0 +1,21 @@
+name: ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pester and package smoke test
+        shell: pwsh
+        run: |
+          Install-Module Pester -RequiredVersion 6.0.0 -Force -SkipPublisherCheck -Scope CurrentUser
+          Import-Module Pester -RequiredVersion 6.0.0
+          Invoke-Pester -Path ./tests -CI
+          $package = Join-Path $env:RUNNER_TEMP 'handoff-package'
+          ./tools/Build-HandoffPackage.ps1 -OutDirectory $package
+          pwsh -NoProfile -File ./tests/package/Test-HandoffPackage.ps1 -PackageRoot $package
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
