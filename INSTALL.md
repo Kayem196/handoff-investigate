@@ -94,14 +94,21 @@ Import-Module Microsoft.Graph.Authentication -RequiredVersion 2.38.1
 Connect-MgGraph -TenantId $tenantId -ClientId $clientId -ContextScope Process -NoWelcome `
     -Scopes GroupMember.Read.All, Policy.Read.All, DeviceManagementConfiguration.Read.All
 Import-Module Handoff
-Start-HandoffGroupInvestigation -TenantId $tenantId -ClientId $clientId -Account $account `
-    -OutDirectory (Join-Path $env:LOCALAPPDATA ('Handoff/Investigations/' + [guid]::NewGuid()))
+$investigationsRoot = Join-Path $env:LOCALAPPDATA 'Handoff/Investigations'
+$null = New-Item -ItemType Directory -Path $investigationsRoot -Force
+$investigation = Start-HandoffGroupInvestigation -TenantId $tenantId -ClientId $clientId -Account $account `
+    -OutDirectory (Join-Path $investigationsRoot ([guid]::NewGuid().ToString()))
+$investigation
 ```
 
 Add `-UseDeviceAuthentication` to `Connect-MgGraph` if a browser sign-in isn't
 available. If Microsoft asks for new consent or shows an unexpected app,
 tenant or account, stop. The guide also refuses a session with extra API scopes.
 Close the window when finished.
+
+For your first hands-on session, use the
+[manual testing checklist](docs/USER-TESTING.md). Start with test groups and
+compare the saved findings against Entra and Intune before trying optional AI.
 
 Outputs are local plaintext evidence and reports. Keep them out of Git and
 sync folders, and review them before sharing. Results cover only explicit

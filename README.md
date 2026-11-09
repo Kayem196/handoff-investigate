@@ -62,6 +62,8 @@ Import-Module Handoff
 ## Documentation
 
 - [INSTALL.md](INSTALL.md): setup, permissions and removing access
+- [Manual testing checklist](docs/USER-TESTING.md): first-session questions,
+  expected evidence and optional Axon checks
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): command reference, data contracts,
   limits and verification records
 - [docs/KNOWN-ANSWER-CHECKS.md](docs/KNOWN-ANSWER-CHECKS.md),
