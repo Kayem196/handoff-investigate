@@ -114,8 +114,8 @@ Axon is optional, and Handoff is complete without it. To use it, bring your own
 API key for Anthropic (recommended), OpenAI or an Azure OpenAI deployment.
 Preview what would be sent with `-PreviewOnly`. Nothing is sent until you type
 `SHARE`. See [Optional Axon explanations](docs/DEVELOPMENT.md#optional-axon-explanations)
-for exactly what is shared and how failures are reported. Anthropic has been verified live with
-fictional data; OpenAI and Azure OpenAI have not.
+for exactly what is shared and how failures are reported. Anthropic and OpenAI have been verified
+live with fictional data; Azure OpenAI has not.
 
 ## Verified and not yet verified
 

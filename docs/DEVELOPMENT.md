@@ -338,10 +338,15 @@ OpenAI live check, 9 November, with fictional data and model `gpt-5`:
 - The operator's real key was accepted, and the request was sent after `SHARE`,
   but OpenAI returned HTTP 429 instead of an answer. That is consistent with an
   account that has no API credit.
-- That outcome led to the new `provider_quota_exhausted` code. Repeat once the
-  account has credit.
+- That outcome led to the new `provider_quota_exhausted` code.
+- **After credit was added, the rerun passed** (source `f3261da8`, `gpt-5`,
+  `max_completion_tokens`). The invalid key again mapped to
+  `provider_auth_failed`. The real answer was complete (not truncated). It
+  listed both references, put the incomplete compliance source first and
+  declined a deletion verdict. It also pointed to the manual checks. The results
+  contain no key material.
 
-A live OpenAI answer and Azure OpenAI as a whole remain unverified live, as is behaviour with real tenant evidence or hostile policy names against a
+Azure OpenAI remains unverified live, as is behaviour with real tenant evidence or hostile policy names against a
 live model. Axon can't yet start guided reads, and consent is
 per request, not stored per investigation.
 
