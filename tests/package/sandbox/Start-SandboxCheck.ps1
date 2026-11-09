@@ -11,7 +11,9 @@ try {
     if (-not $zip) { throw 'Portable PowerShell zip missing from the kit.' }
     $expected = (Get-Content -LiteralPath (Join-Path $KitPath 'POWERSHELL-SHA256.txt') -Raw).Trim().Split(' ')[0]
     if ((Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash -ne $expected) { throw 'Portable PowerShell checksum mismatch.' }
-    Expand-Archive -LiteralPath $zip.FullName -DestinationPath 'C:\pwsh7' -Force
+    # Sandbox can lack Archive module language resources; .NET extraction needs none.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::ExtractToDirectory($zip.FullName, 'C:\pwsh7')
     $network = @(Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object Status -eq 'Up').Count
     $record.networkAdaptersUp = $network
     "Network adapters up inside sandbox: $network" | Tee-Object -FilePath (Join-Path $log 'network.txt')
