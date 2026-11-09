@@ -94,6 +94,17 @@ Describe 'Local Handoff workspace boundaries' {
         $state.grants.Count | Should -Be 0
         $state.pending | Should -BeNullOrEmpty
     }
+    It 'retains truncation warnings when reopening a conversation without sending UI metadata to the model' {
+        Mock Send-HandoffAxonRequest -ModuleName Handoff.Axon { @{status=200;body=@{choices=@(@{finish_reason='length';message=@{content='Partial answer'}})}} }
+        $null=Action $state provider @{provider='OpenAI';model='gpt-5';apiKey='fictional-provider-key-123'}
+        $prepared=Action $state prepare @{id='example';question='Explain'}
+        $null=Action $state send @{id='example';ticket=$prepared.ticket;approveSharing=$true}
+        $reopened=Action $state investigation @{id='example'}
+        $reopened.messages[1].truncated | Should -BeTrue
+        $followup=Action $state prepare @{id='example';question='Continue'}
+        $messages=($followup.technicalPayload | ConvertFrom-Json -AsHashtable).messages
+        $messages[2].ContainsKey('truncated') | Should -BeFalse
+    }
     It 'rejects invalid provider configuration without replacing approved settings' {
         foreach ($bad in @(@{provider='Other';model='gpt-5';apiKey='fictional-key-123'},@{provider='OpenAI';model='https://elsewhere';apiKey='fictional-key-123'},@{provider='OpenAI';model='gpt-5';apiKey="private`nheader"})) {
             { Action $state provider $bad } | Should -Throw '*Check the provider*'

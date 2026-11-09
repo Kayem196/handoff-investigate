@@ -118,7 +118,7 @@ async function choose(id) {
     $('selection-detail').textContent = `Recorded ${dateLabel(data.report.collectedAt)}. Ask about its policies and relationships, then follow up in the same conversation.`;
     $('messages').replaceChildren(); $('welcome').hidden = data.messages.length > 0;
     $('welcome-note').textContent = data.sample ? 'This sample is fictional. AI answers require your provider key and sharing approval.' : 'This is real saved tenant evidence. Nothing goes to an AI provider until you approve sharing.';
-    for (const message of data.messages) addMessage(message.role, message.content);
+    for (const message of data.messages) addMessage(message.role, message.content, message.truncated ? 'The provider cut this answer short. Ask a more focused follow-up.' : undefined);
     $('question').value = ''; showError('chat-error', '');
     renderList(); renderEvidence(data.report, data.sample); updateSharingStatus(data.approved);
   } catch (error) { showError('notice', error.message); }
@@ -142,10 +142,11 @@ async function sendPrepared(prepared, approveSharing) {
   $('messages').append(waiting); scrollToLatest();
   try {
     const result = await api('send', { id: selected, ticket: prepared.ticket, approveSharing });
+    updateSharingStatus(true);
     waiting.remove();
     if (result.status !== 'answered') { user.remove(); throw new Error(failureMessages[result.failureCode] || 'The provider could not answer. No fallback provider was used.'); }
     addMessage('assistant', result.answer, result.truncated ? 'The provider cut this answer short. Ask a more focused follow-up.' : undefined);
-    $('question').value = ''; updateSharingStatus(true);
+    $('question').value = '';
     $('announcer').textContent = 'Handoff answered. The response is in the conversation.';
   } catch (error) { waiting.remove(); user.remove(); showError('chat-error', error.message); }
   finally { busyState(false); $('question').focus(); }

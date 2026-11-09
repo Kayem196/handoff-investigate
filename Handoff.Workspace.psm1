@@ -103,7 +103,7 @@ function Invoke-HandoffWorkspaceAction {
             $State.grants[$Body.id]=$true
             $answer = & $script:Axon { param($p,$k) Send-HandoffAxonConversationTurn -Prepared $p -ApiKey $k } $pending.prepared $State.key
             if ($answer.status -eq 'answered') {
-                $State.history[$Body.id] = @($State.history[$Body.id] | Where-Object { $null -ne $_ }) + @(@{role='user';content=$pending.question},@{role='assistant';content=$answer.answer})
+                $State.history[$Body.id] = @($State.history[$Body.id] | Where-Object { $null -ne $_ }) + @(@{role='user';content=$pending.question},@{role='assistant';content=$answer.answer;truncated=[bool]$answer.truncated})
             }
             return $answer
         }
