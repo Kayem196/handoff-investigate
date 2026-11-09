@@ -122,17 +122,23 @@ Microsoft's documented API but has not been tested against a real deployment.
 
 The package build, checksums, an isolated module-path import, offline commands
 and the packaged example have been checked on the development Windows machine.
-Live reads have been accepted in one test tenant. Still unverified:
+On 9 November 2026, the offline clean-install check also passed in a fresh
+Windows Sandbox (Windows build 26100, portable PowerShell 7.6.9), with networking
+disabled and no pre-existing Handoff or Graph SDK. All 11 commands imported in a
+fresh process under RemoteSigned, without an inherited execution-policy bypass;
+reports and transport compilation passed. Live reads have separately been
+accepted in one test tenant. Still unverified:
 
-- a genuinely clean second machine or user profile
+- installation on a separate physical machine or an organisation-managed profile
 - other Windows and PowerShell versions
 - PowerShell Gallery publication
 - signed scripts and AllSigned execution policy
+- downloaded-file trust prompts (the Sandbox package had no download markers)
+- proxies
+- readers with fewer rights than Global Administrator
+- large or multipage tenants
 
 For an offline clean-environment check, see the
 [Windows Sandbox kit](tests/package/sandbox/README.md). It bundles portable
 PowerShell, disables networking and preserves results outside the disposable
 Sandbox. A local kit rehearsal is not a genuine Sandbox acceptance result.
-- proxies
-- readers with fewer rights than Global Administrator
-- large or multipage tenants

@@ -85,6 +85,24 @@ this is not clean-install or complete Microsoft acceptance. See the
 [Windows baseline and staged known-answer checks](KNOWN-ANSWER-CHECKS.md) for
 the exact source revision, test profile requirements and outstanding live cases.
 
+### Offline clean-install acceptance — 9 November 2026
+
+A fresh Windows Sandbox (Windows build 26100, portable PowerShell 7.6.9,
+.NET 10.0.14) passed all eight clean-install steps, with networking disabled
+and no pre-existing Handoff or Graph Authentication module. Package checksums
+matched; installation to the Sandbox user's normal module path succeeded.
+The fresh-process import exposed all 11 declared commands under RemoteSigned
+with `Process=Undefined`, not the bootstrap's Bypass. The fictional example
+produced HTML/JSON with its two expected references, the transport helper
+compiled, and offline use did not load the Graph SDK. The bootstrap and check
+both reported PASS and exit code 0.
+
+The initial attempt failed before installation because Windows PowerShell's
+Archive module lacked an en-GB resource file. Its failed record was retained;
+the accepted rerun used .NET ZIP extraction instead. This verifies offline
+installation only, not tenant authentication, downloaded-file trust prompts,
+AllSigned policy or other Windows/PowerShell combinations.
+
 ## Saved investigations, notes and refresh comparisons
 
 `Handoff.Evidence.psm1` is offline and needs no Graph SDK, login, server or AI.
